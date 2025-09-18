@@ -804,7 +804,7 @@ extension EntityAuth {
 
 // MARK: - ASAuthorizationControllerDelegate
 extension EntityAuth: ASAuthorizationControllerDelegate {
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+    public func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let reg = authorization.credential as? ASAuthorizationPublicKeyCredentialRegistration {
             pendingRegistration?.resume(returning: reg)
             pendingRegistration = nil
@@ -821,7 +821,7 @@ extension EntityAuth: ASAuthorizationControllerDelegate {
         activeAuthController = nil
     }
 
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+    public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         pendingRegistration?.resume(throwing: error)
         pendingAssertion?.resume(throwing: error)
         pendingRegistration = nil
@@ -832,7 +832,7 @@ extension EntityAuth: ASAuthorizationControllerDelegate {
 
 // MARK: - ASAuthorizationControllerPresentationContextProviding
 extension EntityAuth: ASAuthorizationControllerPresentationContextProviding {
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         #if os(iOS)
         if let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
