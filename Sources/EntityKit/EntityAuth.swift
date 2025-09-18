@@ -37,22 +37,22 @@ private func keychainGet(_ key: String) -> String? {
 
 // MARK: - Shared EntityAuth client
 @MainActor
-final class EntityAuth: NSObject, ObservableObject {
-    static let shared = EntityAuth()
+public final class EntityAuth: NSObject, ObservableObject {
+    public static let shared = EntityAuth()
 
     private let baseURLDefaultsKey = "EA_BASE_URL"
     var persistedBaseURL: String { UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com" }
-    @Published var baseURL: URL
+    @Published public var baseURL: URL
 
-    @Published private(set) var accessToken: String?
-    @Published private(set) var sessionId: String?
-    @Published private(set) var userId: String?
-    @Published private(set) var liveUsername: String?
-    @Published private(set) var logs: [String] = []
-    @Published private(set) var isPasskeyBusy: Bool = false
+    @Published public private(set) var accessToken: String?
+    @Published public private(set) var sessionId: String?
+    @Published public private(set) var userId: String?
+    @Published public private(set) var liveUsername: String?
+    @Published public private(set) var logs: [String] = []
+    @Published public private(set) var isPasskeyBusy: Bool = false
     @Published private(set) var passkeyStatus: (rpId: String, count: Int)?
     @Published private(set) var cachedTenantId: String?
-    @Published private(set) var liveSessions: [SessionDoc] = []
+    @Published public private(set) var liveSessions: [SessionDoc] = []
 
     var onLogout: (() -> Void)?
 
@@ -68,12 +68,12 @@ final class EntityAuth: NSObject, ObservableObject {
     private var pendingRegistration: CheckedContinuation<ASAuthorizationPublicKeyCredentialRegistration, Error>?
     private var pendingAssertion: CheckedContinuation<ASAuthorizationPublicKeyCredentialAssertion, Error>?
 
-    struct SessionDoc: Decodable, Equatable {
-        let _id: String?
-        let status: String?
-        let deviceId: String?
-        struct Device: Decodable, Equatable { let userAgent: String?; let ip: String?; let platform: String? }
-        let device: Device?
+    public struct SessionDoc: Decodable, Equatable {
+        public let _id: String?
+        public let status: String?
+        public let deviceId: String?
+        public struct Device: Decodable, Equatable { public let userAgent: String?; public let ip: String?; public let platform: String? }
+        public let device: Device?
     }
 
     private override init() {
@@ -93,12 +93,12 @@ final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: Public API
-    func register(email: String, password: String, tenantId: String) async throws {
+    public func register(email: String, password: String, tenantId: String) async throws {
         let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
         _ = try await post(path: "/api/auth/register", headers: ["x-client": "native"], json: body, authorized: false)
     }
 
-    func login(email: String, password: String, tenantId: String) async throws {
+    public func login(email: String, password: String, tenantId: String) async throws {
         let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
         var headers: [String: String] = ["x-client": "native"]
         if let did = ensureDeviceId() { headers["x-device-uuid"] = did }
@@ -134,7 +134,7 @@ final class EntityAuth: NSObject, ObservableObject {
         Task { await self.fetchCurrentUserProfile() }
     }
 
-    func refresh() async throws {
+    public func refresh() async throws {
         let url = baseURL.appendingPathComponent("/api/auth/refresh")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -153,7 +153,7 @@ final class EntityAuth: NSObject, ObservableObject {
         print("[EA-DEBUG] refresh: new access token set")
     }
 
-    func logout() async {
+    public func logout() async {
         if let sid = self.sessionId {
             _ = try? await post(path: "/api/auth/logout", headers: [:], json: ["sessionId": sid], authorized: true)
         } else if let refresh = keychainGet("ea_refresh") {
@@ -180,7 +180,7 @@ final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: - Passkeys
-    func passkeyRegister(username: String) async throws {
+    public func passkeyRegister(username: String) async throws {
         if isPasskeyBusy {
             return
         }
@@ -238,7 +238,7 @@ final class EntityAuth: NSObject, ObservableObject {
     }
 
     // New email-based registration flow: auto-creates user if missing and auto-logs-in on verify
-    func passkeyRegister(email: String, tenantId: String = "t1") async throws {
+    public func passkeyRegister(email: String, tenantId: String = "t1") async throws {
         if isPasskeyBusy {
             return
         }
@@ -324,7 +324,7 @@ final class EntityAuth: NSObject, ObservableObject {
         Task { await self.fetchCurrentUserProfile() }
     }
 
-    func passkeyLogin(email: String, tenantId: String) async throws {
+    public func passkeyLogin(email: String, tenantId: String) async throws {
         if isPasskeyBusy {
             return
         }
@@ -413,7 +413,7 @@ final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: - Username APIs
-    func setUsername(_ username: String) async throws {
+    public func setUsername(_ username: String) async throws {
         let body: [String: Any] = ["username": username]
         let data = try await post(path: "/api/user/username/set", headers: ["x-client": "native"], json: body, authorized: true)
         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let ok = json["ok"] as? Bool, ok {
@@ -427,7 +427,7 @@ final class EntityAuth: NSObject, ObservableObject {
 
     // fetchCurrentUser removed in favor of realtime Convex subscription
 
-    func checkUsernameAvailability(_ username: String) async throws -> Bool {
+    public func checkUsernameAvailability(_ username: String) async throws -> Bool {
         let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
         let data = try await get(path: "/api/user/username/check?value=\(encoded)", authorized: true)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
@@ -437,7 +437,7 @@ final class EntityAuth: NSObject, ObservableObject {
     }
 
     // Derive current session (tenantId) from API
-    func fetchCurrentTenantId() async -> String? {
+    public func fetchCurrentTenantId() async -> String? {
         // Throttle to avoid tight loops from view re-renders
         if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
             return cachedTenantId
@@ -727,12 +727,12 @@ final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: Utilities
-    func currentDeviceId() -> String? {
+    public func currentDeviceId() -> String? {
         return keychainGet("ea_device_id")
     }
 
     @discardableResult
-    func upsertDevice(name: String?) async -> Bool {
+    public func upsertDevice(name: String?) async -> Bool {
         do {
             let did = ensureDeviceId() ?? currentDeviceId() ?? UUID().uuidString.lowercased()
             let body: [String: Any] = [
@@ -748,7 +748,7 @@ final class EntityAuth: NSObject, ObservableObject {
         }
     }
 
-    func fetchPasskeyStatus() async {
+    public func fetchPasskeyStatus() async {
         guard let uid = self.userId else {
             self.passkeyStatus = nil
             return
