@@ -764,7 +764,7 @@ public final class EntityAuth: NSObject, ObservableObject {
             self.passkeyStatus = nil
         }
     }
-    func testConnection() async {
+    public func testConnection() async {
         do {
             _ = try await request(method: "GET", path: "/", headers: ["accept": "text/html"], body: nil)
         } catch {
