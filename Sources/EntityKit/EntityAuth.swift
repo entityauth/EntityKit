@@ -41,7 +41,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     public static let shared = EntityAuth()
 
     private let baseURLDefaultsKey = "EA_BASE_URL"
-    var persistedBaseURL: String { UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com" }
+    public var persistedBaseURL: String { UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com" }
     @Published public var baseURL: URL
 
     @Published public private(set) var accessToken: String?
