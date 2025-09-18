@@ -179,6 +179,66 @@ public final class EntityAuth: NSObject, ObservableObject {
         #endif
     }
 
+    // MARK: - Organizations
+    public func createOrg(tenantId: String, name: String, slug: String, ownerId: String) async throws {
+        let body: [String: Any] = [
+            "tenantId": tenantId,
+            "name": name,
+            "slug": slug,
+            "ownerId": ownerId,
+        ]
+        _ = try await post(path: "/api/org/create", headers: [:], json: body, authorized: true)
+    }
+
+    public func addMember(orgId: String, userId: String, role: String) async throws {
+        let body: [String: Any] = [
+            "orgId": orgId,
+            "userId": userId,
+            "role": role,
+        ]
+        _ = try await post(path: "/api/org/add-member", headers: [:], json: body, authorized: true)
+    }
+
+    public func switchOrg(orgId: String) async throws {
+        let body: [String: Any] = ["orgId": orgId]
+        _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
+    }
+
+    // MARK: - Sessions helpers
+    public func getCurrentSession() async throws -> [String: Any]? {
+        let data = try await get(path: "/api/session/current", authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    public func listSessions() async throws -> [SessionDoc] {
+        let data = try await request(method: "GET", path: "/api/session/list", headers: authHeader(), body: nil)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let arr = json?["sessions"] as? [[String: Any]] ?? []
+        let decoded: [SessionDoc] = try JSONDecoder().decode([SessionDoc].self, from: try JSONSerialization.data(withJSONObject: arr))
+        return decoded
+    }
+
+    public func sessionById(_ sessionId: String) async throws -> [String: Any]? {
+        let body: [String: Any] = ["sessionId": sessionId]
+        let data = try await post(path: "/api/session/by-id", headers: [:], json: body, authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    public func revokeSession(sessionId: String) async throws {
+        let body: [String: Any] = ["sessionId": sessionId]
+        _ = try await post(path: "/api/session/revoke", headers: [:], json: body, authorized: true)
+    }
+
+    public func revokeByDevice(deviceId: String) async throws {
+        let body: [String: Any] = ["deviceId": deviceId]
+        _ = try await post(path: "/api/session/revoke-by-device", headers: [:], json: body, authorized: true)
+    }
+
+    public func revokeByUser(userId: String) async throws {
+        let body: [String: Any] = ["userId": userId]
+        _ = try await post(path: "/api/session/revoke-by-user", headers: [:], json: body, authorized: true)
+    }
+
     // MARK: - Passkeys
     public func passkeyRegister(username: String) async throws {
         if isPasskeyBusy {
@@ -434,6 +494,24 @@ public final class EntityAuth: NSObject, ObservableObject {
         let isValid = (json["valid"] as? Bool) ?? false
         let isAvailable = (json["available"] as? Bool) ?? false
         return isValid && isAvailable
+    }
+
+    // MARK: - Users
+    public func getUserMe() async throws -> [String: Any]? {
+        let data = try await get(path: "/api/user/me", authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    public func userByUsername(_ username: String) async throws -> [String: Any]? {
+        let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
+        let data = try await get(path: "/api/user/by-username?username=\(encoded)", authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    public func userByEmail(_ email: String) async throws -> [String: Any]? {
+        let body: [String: Any] = ["email": email]
+        let data = try await post(path: "/api/user/by-email", headers: [:], json: body, authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
     // Derive current session (tenantId) from API
