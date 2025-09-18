@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "EntityKit", targets: ["EntityKit"])
     ],
     dependencies: [
-        .package(url: "https://github.com/entityauth/convex-swift.git", branch: "main")
+        .package(url: "https://github.com/entityauth/convex-swift.git", from: "0.1.0")
     ],
     targets: [
         .target(
