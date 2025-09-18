@@ -10,8 +10,16 @@ let package = Package(
     products: [
         .library(name: "EntityKit", targets: ["EntityKit"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/entityauth/convex-swift.git", branch: "main")
+    ],
     targets: [
-        .target(name: "EntityKit"),
+        .target(
+            name: "EntityKit",
+            dependencies: [
+                .product(name: "ConvexMobile", package: "convex-swift")
+            ]
+        ),
         .testTarget(name: "EntityKitTests", dependencies: ["EntityKit"])
     ]
 )

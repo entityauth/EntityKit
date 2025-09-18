@@ -2,6 +2,7 @@ import Foundation
 import Security
 import SwiftUI
 import Combine
+import ConvexMobile
 import AuthenticationServices
 #if os(iOS)
 import UIKit
@@ -36,29 +37,44 @@ private func keychainGet(_ key: String) -> String? {
 
 // MARK: - Shared EntityAuth client
 @MainActor
-public final class EntityAuth: NSObject, ObservableObject {
-    public static let shared = EntityAuth()
+final class EntityAuth: NSObject, ObservableObject {
+    static let shared = EntityAuth()
 
     private let baseURLDefaultsKey = "EA_BASE_URL"
-    public var persistedBaseURL: String { UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com" }
-    @Published public var baseURL: URL
+    var persistedBaseURL: String { UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com" }
+    @Published var baseURL: URL
 
-    @Published public private(set) var accessToken: String?
-    @Published public private(set) var sessionId: String?
-    @Published public private(set) var userId: String?
-    @Published public private(set) var logs: [String] = []
-    @Published public private(set) var isPasskeyBusy: Bool = false
-    @Published public private(set) var passkeyStatus: (rpId: String, count: Int)?
-    @Published public private(set) var cachedTenantId: String?
+    @Published private(set) var accessToken: String?
+    @Published private(set) var sessionId: String?
+    @Published private(set) var userId: String?
+    @Published private(set) var liveUsername: String?
+    @Published private(set) var logs: [String] = []
+    @Published private(set) var isPasskeyBusy: Bool = false
+    @Published private(set) var passkeyStatus: (rpId: String, count: Int)?
+    @Published private(set) var cachedTenantId: String?
+    @Published private(set) var liveSessions: [SessionDoc] = []
 
-    public var onLogout: (() -> Void)?
+    var onLogout: (() -> Void)?
 
-    private var watcherTask: Task<Void, Never>?
+    private var sessionSubscription: AnyCancellable?
+    private var userSubscription: AnyCancellable?
+    private var sessionsSubscription: AnyCancellable?
+    private var convexClient: ConvexClient?
+    private var convexClientTag: String?
+    private var clientCreationTask: Task<ConvexClient?, Never>?
     private var lastTenantFetchAt: Date?
     private var tenantFetchInFlight = false
     private var activeAuthController: ASAuthorizationController?
     private var pendingRegistration: CheckedContinuation<ASAuthorizationPublicKeyCredentialRegistration, Error>?
     private var pendingAssertion: CheckedContinuation<ASAuthorizationPublicKeyCredentialAssertion, Error>?
+
+    struct SessionDoc: Decodable, Equatable {
+        let _id: String?
+        let status: String?
+        let deviceId: String?
+        struct Device: Decodable, Equatable { let userAgent: String?; let ip: String?; let platform: String? }
+        let device: Device?
+    }
 
     private override init() {
         let initial = UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com"
@@ -66,37 +82,26 @@ public final class EntityAuth: NSObject, ObservableObject {
         super.init()
     }
 
-    public func updateBaseURL(_ urlString: String) {
+    func updateBaseURL(_ urlString: String) {
         guard let url = URL(string: urlString), url.scheme?.hasPrefix("http") == true else { return }
         self.baseURL = url
         UserDefaults.standard.set(urlString, forKey: baseURLDefaultsKey)
     }
 
-    // MARK: Logging
-    func log(_ s: String) {
-        let line = "[\(Date())] \(s)"
-        logs.insert(line, at: 0)
-        if logs.count > 200 { _ = logs.popLast() }
-        print(line)
-    }
-    
-    func clearLogs() {
+    public func clearLogs() {
         logs.removeAll()
     }
 
     // MARK: Public API
-    public func register(email: String, password: String, tenantId: String) async throws {
-        log("register start: tenant=\(tenantId) email=\(email)")
+    func register(email: String, password: String, tenantId: String) async throws {
         let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
         _ = try await post(path: "/api/auth/register", headers: ["x-client": "native"], json: body, authorized: false)
-        log("register ok")
     }
 
-    public func login(email: String, password: String, tenantId: String) async throws {
-        log("login start: tenant=\(tenantId) email=\(email)")
+    func login(email: String, password: String, tenantId: String) async throws {
         let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
         var headers: [String: String] = ["x-client": "native"]
-        if let did = ensureDeviceId() { headers["x-device-id"] = did }
+        if let did = ensureDeviceId() { headers["x-device-uuid"] = did }
         headers["x-device-platform"] = platformHeader()
         let data = try await post(path: "/api/auth/login", headers: headers, json: body, authorized: false)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -109,9 +114,9 @@ public final class EntityAuth: NSObject, ObservableObject {
 
         keychainSet("ea_refresh", refresh)
         self.accessToken = access
+        print("[EA-DEBUG] login: access token set? \(self.accessToken != nil)")
         self.sessionId = sid
         self.userId = uid
-        log("login ok: userId=\(uid) sessionId=\(sid)")
         // Upsert device entity
         if let did = keychainGet("ea_device_id") {
             _ = try? await post(path: "/api/device/upsert", headers: [:], json: [
@@ -121,16 +126,20 @@ public final class EntityAuth: NSObject, ObservableObject {
                 "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
             ], authorized: true)
         }
+        print("[EA-DEBUG] login: starting watchers with token? \(self.accessToken != nil)")
         startSessionWatcher()
+        startUserWatcher()
+        startSessionsWatcher()
+        // Eagerly populate profile fields for immediate UI
+        Task { await self.fetchCurrentUserProfile() }
     }
 
-    public func refresh() async throws {
-        log("refresh start")
+    func refresh() async throws {
         let url = baseURL.appendingPathComponent("/api/auth/refresh")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         if let refreshToken = keychainGet("ea_refresh") { req.addValue(refreshToken, forHTTPHeaderField: "x-refresh-token") }
-        if let did = keychainGet("ea_device_id") { req.addValue(did, forHTTPHeaderField: "x-device-id") }
+        if let did = keychainGet("ea_device_id") { req.addValue(did, forHTTPHeaderField: "x-device-uuid") }
         req.addValue(platformHeader(), forHTTPHeaderField: "x-device-platform")
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw NSError(domain: "EntityAuth", code: 500) }
@@ -141,11 +150,10 @@ public final class EntityAuth: NSObject, ObservableObject {
             keychainSet("ea_refresh", newRefresh)
         }
         self.accessToken = access
-        log("refresh ok")
+        print("[EA-DEBUG] refresh: new access token set")
     }
 
-    public func logout() async {
-        log("logout start")
+    func logout() async {
         if let sid = self.sessionId {
             _ = try? await post(path: "/api/auth/logout", headers: [:], json: ["sessionId": sid], authorized: true)
         } else if let refresh = keychainGet("ea_refresh") {
@@ -156,15 +164,24 @@ public final class EntityAuth: NSObject, ObservableObject {
         self.accessToken = nil
         self.sessionId = nil
         self.userId = nil
-        watcherTask?.cancel()
-        watcherTask = nil
-        log("logout ok")
+        self.liveUsername = nil
+        self.liveSessions = []
+        sessionSubscription?.cancel()
+        sessionSubscription = nil
+        userSubscription?.cancel()
+        userSubscription = nil
+        sessionsSubscription?.cancel()
+        sessionsSubscription = nil
+        // Clear Convex client on logout
+        self.convexClient = nil
+        #if os(macOS)
+        stopMacOSFallbackPolling()
+        #endif
     }
 
     // MARK: - Passkeys
-    public func passkeyRegister(username: String) async throws {
+    func passkeyRegister(username: String) async throws {
         if isPasskeyBusy {
-            log("passkey.register aborted: another passkey operation is in progress")
             return
         }
         isPasskeyBusy = true
@@ -172,7 +189,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         guard let uid = self.userId else {
             throw NSError(domain: "EntityAuth", code: 700, userInfo: [NSLocalizedDescriptionKey: "Login required before creating a passkey"])
         }
-        log("passkey.register options start: userId=\(uid) username=\(username)")
         let data = try await post(path: "/api/passkey/register/options", headers: ["x-client": "native"], json: ["userId": uid, "username": username], authorized: true)
         // Parse options (legacy internal API kept for backwards compat of this overload)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -196,21 +212,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         do {
             registration = try await performPasskeyRegistration(request: request)
         } catch let nsError as NSError {
-            if nsError.domain == ASAuthorizationError.errorDomain {
-                let code = ASAuthorizationError.Code(rawValue: nsError.code) ?? .unknown
-                let reason: String
-                switch code {
-                case .canceled: reason = "canceled by user"
-                case .notHandled: reason = "not handled"
-                case .invalidResponse: reason = "invalid response"
-                case .failed: reason = "authorization failed"
-                case .unknown: reason = "unknown error"
-                default: reason = "unknown error"
-                }
-                log("passkey.register error: \(reason) (code=\(nsError.code)) rpId=\(rpId)")
-            } else {
-                log("passkey.register error: \(nsError.localizedDescription)")
-            }
             throw nsError
         }
 
@@ -234,13 +235,11 @@ public final class EntityAuth: NSObject, ObservableObject {
         ]
 
         _ = try await post(path: "/api/passkey/register/verify", headers: ["x-client": "native"], json: ["userId": uid, "response": response], authorized: true)
-        log("passkey.register verify ok")
     }
 
     // New email-based registration flow: auto-creates user if missing and auto-logs-in on verify
-    public func passkeyRegister(email: String, tenantId: String = "t1") async throws {
+    func passkeyRegister(email: String, tenantId: String = "t1") async throws {
         if isPasskeyBusy {
-            log("passkey.register aborted: another passkey operation is in progress")
             return
         }
         isPasskeyBusy = true
@@ -250,7 +249,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         guard !trimmedEmail.isEmpty else {
             throw NSError(domain: "EntityAuth", code: 704, userInfo: [NSLocalizedDescriptionKey: "Email is required for passkey registration"])
         }
-        log("passkey.register options (email) start: email=\(trimmedEmail) tenant=\(tenantId)")
         let data = try await post(path: "/api/passkey/register/options", headers: ["x-client": "native"], json: ["tenantId": tenantId, "email": trimmedEmail], authorized: false)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let options = json["options"] as? [String: Any],
@@ -274,21 +272,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         do {
             registration = try await performPasskeyRegistration(request: request)
         } catch let nsError as NSError {
-            if nsError.domain == ASAuthorizationError.errorDomain {
-                let code = ASAuthorizationError.Code(rawValue: nsError.code) ?? .unknown
-                let reason: String
-                switch code {
-                case .canceled: reason = "canceled by user"
-                case .notHandled: reason = "not handled"
-                case .invalidResponse: reason = "invalid response"
-                case .failed: reason = "authorization failed"
-                case .unknown: reason = "unknown error"
-                default: reason = "unknown error"
-                }
-                log("passkey.register error: \(reason) (code=\(nsError.code)) rpId=\(rpId)")
-            } else {
-                log("passkey.register error: \(nsError.localizedDescription)")
-            }
             throw nsError
         }
 
@@ -311,7 +294,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         ]
 
         var headers: [String: String] = ["x-client": "native"]
-        if let did = ensureDeviceId() { headers["x-device-id"] = did }
+        if let did = ensureDeviceId() { headers["x-device-uuid"] = did }
         headers["x-device-platform"] = platformHeader()
         let verifyData = try await post(path: "/api/passkey/register/verify", headers: headers, json: ["userId": uid, "response": response], authorized: false)
         let verified = try JSONSerialization.jsonObject(with: verifyData) as? [String: Any]
@@ -326,7 +309,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         self.accessToken = access
         self.sessionId = sid
         self.userId = userId
-        log("passkey.register ok: userId=\(userId) sessionId=\(sid)")
         if let did = keychainGet("ea_device_id") {
             _ = try? await post(path: "/api/device/upsert", headers: [:], json: [
                 "uuid": did,
@@ -336,21 +318,22 @@ public final class EntityAuth: NSObject, ObservableObject {
             ], authorized: true)
         }
         startSessionWatcher()
+        startUserWatcher()
+        startSessionsWatcher()
+        // Eagerly populate profile fields for immediate UI
+        Task { await self.fetchCurrentUserProfile() }
     }
 
-    public func passkeyLogin(email: String, tenantId: String) async throws {
+    func passkeyLogin(email: String, tenantId: String) async throws {
         if isPasskeyBusy {
-            log("passkey.login aborted: another passkey operation is in progress")
             return
         }
         isPasskeyBusy = true
         defer { isPasskeyBusy = false }
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedEmail.isEmpty else {
-            log("passkey.login aborted: Email required. Enter an email first.")
             throw NSError(domain: "EntityAuth", code: 709, userInfo: [NSLocalizedDescriptionKey: "Email is required for passkey sign-in"])
         }
-        log("passkey.login options start: email=\(trimmedEmail) tenant=\(tenantId)")
         let data = try await post(path: "/api/passkey/login/options", headers: ["x-client": "native"], json: ["tenantId": tenantId, "email": trimmedEmail], authorized: false)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let options = json["options"] as? [String: Any],
@@ -362,7 +345,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         guard let challenge = Data(base64URLEncoded: challengeB64u), !rpId.isEmpty else {
             throw NSError(domain: "EntityAuth", code: 712, userInfo: [NSLocalizedDescriptionKey: "Invalid rpId or challenge"])
         }
-        log("passkey.login using rpId=\(rpId)")
 
         guard let uid = json["userId"] as? String else {
             throw NSError(domain: "EntityAuth", code: 714, userInfo: [NSLocalizedDescriptionKey: "Missing userId in options response"])
@@ -376,27 +358,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         do {
             assertion = try await performPasskeyAssertion(request: request)
         } catch let nsError as NSError {
-            if nsError.domain == ASAuthorizationError.errorDomain {
-                let code = ASAuthorizationError.Code(rawValue: nsError.code) ?? .unknown
-                let reason: String
-                switch code {
-                case .canceled:
-                    reason = "canceled by user"
-                case .notHandled:
-                    reason = "not handled / no matching passkey for rpId"
-                case .invalidResponse:
-                    reason = "invalid response"
-                case .failed:
-                    reason = "authorization failed (likely no matching passkey)"
-                case .unknown:
-                    reason = "unknown error"
-                default:
-                    reason = "unknown error"
-                }
-                log("passkey.login assertion error: \(reason) (code=\(nsError.code)) rpId=\(rpId)")
-            } else {
-                log("passkey.login assertion error: \(nsError.localizedDescription)")
-            }
             throw nsError
         }
 
@@ -421,7 +382,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         if let userHandle { (response["response"] as? [String: Any]).map { _ in } ; var resp = response["response"] as! [String: Any]; resp["userHandle"] = userHandle; response["response"] = resp }
 
         var headers: [String: String] = ["x-client": "native"]
-        if let did = ensureDeviceId() { headers["x-device-id"] = did }
+        if let did = ensureDeviceId() { headers["x-device-uuid"] = did }
         headers["x-device-platform"] = platformHeader()
         let verifyData = try await post(path: "/api/passkey/login/verify", headers: headers, json: ["userId": uid, "response": response], authorized: false)
         let verified = try JSONSerialization.jsonObject(with: verifyData) as? [String: Any]
@@ -436,7 +397,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         self.accessToken = access
         self.sessionId = sid
         self.userId = userId
-        log("passkey.login ok: userId=\(userId) sessionId=\(sid)")
         // Upsert device entity
         if let did = keychainGet("ea_device_id") {
             _ = try? await post(path: "/api/device/upsert", headers: [:], json: [
@@ -447,32 +407,27 @@ public final class EntityAuth: NSObject, ObservableObject {
             ], authorized: true)
         }
         startSessionWatcher()
+        startUserWatcher()
+        // Eagerly populate profile fields for immediate UI
+        Task { await self.fetchCurrentUserProfile() }
     }
 
     // MARK: - Username APIs
-    public func setUsername(_ username: String) async throws {
+    func setUsername(_ username: String) async throws {
         let body: [String: Any] = ["username": username]
         let data = try await post(path: "/api/user/username/set", headers: ["x-client": "native"], json: body, authorized: true)
         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let ok = json["ok"] as? Bool, ok {
-            log("username.set ok: \(username)")
+            // Immediately reflect in UI; realtime subscription will confirm/update as needed
+            self.liveUsername = username
         } else {
             let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String ?? "Unknown error"
             throw NSError(domain: "EntityAuth", code: 801, userInfo: [NSLocalizedDescriptionKey: msg])
         }
     }
 
-    public func fetchCurrentUser() async throws -> (id: String, username: String?) {
-        log("fetchCurrentUser start: base=\(baseURL.absoluteString)")
-        let data = try await get(path: "/api/user/me", authorized: true)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let id = json["id"] as? String else {
-            throw NSError(domain: "EntityAuth", code: 802, userInfo: [NSLocalizedDescriptionKey: "Invalid /me response"])
-        }
-        let username = json["username"] as? String
-        log("fetchCurrentUser ok: id=\(id) username=\(username ?? "nil")")
-        return (id: id, username: username)
-    }
+    // fetchCurrentUser removed in favor of realtime Convex subscription
 
-    public func checkUsernameAvailability(_ username: String) async throws -> Bool {
+    func checkUsernameAvailability(_ username: String) async throws -> Bool {
         let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
         let data = try await get(path: "/api/user/username/check?value=\(encoded)", authorized: true)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
@@ -482,7 +437,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     // Derive current session (tenantId) from API
-    public func fetchCurrentTenantId() async -> String? {
+    func fetchCurrentTenantId() async -> String? {
         // Throttle to avoid tight loops from view re-renders
         if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
             return cachedTenantId
@@ -534,35 +489,184 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: - Internal
-    private func startSessionWatcher() {
-        watcherTask?.cancel()
-        guard let sid = sessionId else { return }
-        watcherTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                do {
-                    let body = try JSONSerialization.data(withJSONObject: ["sessionId": sid])
-                    var headers = authHeader()
-                    if let did = keychainGet("ea_device_id") { headers["x-device-id"] = did }
-                    headers["x-device-platform"] = platformHeader()
-                    let data = try await request(method: "POST", path: "/api/session/by-id", headers: headers, body: body)
-                    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                    if let session = json?["session"] as? [String: Any] {
-                        if let status = session["status"] as? String, status != "active" {
-                            self.log("watcher: remote logout detected (status=\(status))")
-                            await self.handleRemoteLogout()
-                            return
-                        }
-                    } else {
-                        self.log("watcher: session missing -> remote logout")
-                        await self.handleRemoteLogout()
-                        return
-                    }
-                } catch {
-                    self.log("watcher: transient error: \(error.localizedDescription)")
-                }
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+    private func fetchCurrentUserProfile() async {
+        do {
+            let data = try await get(path: "/api/user/me", authorized: true)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let username = json["username"] as? String
+                await MainActor.run { self.liveUsername = username }
             }
+        } catch {
+            // Best-effort population; realtime watcher will eventually fill
+        }
+    }
+    private func startSessionWatcher() {
+        sessionSubscription?.cancel()
+        guard let sid = sessionId else { return }
+        guard self.accessToken != nil else {
+            print("[EA-DEBUG] startSessionWatcher: aborted, token missing")
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            guard let client = await ensureConvexClient() else { return }
+            struct SessionDoc: Decodable { let status: String? }
+            let updates: AnyPublisher<SessionDoc?, ClientError> = client.subscribe(
+                to: "auth/sessions.js:getById",
+                with: [
+                    "id": sid
+                ],
+                yielding: SessionDoc?.self
+            )
+            self.sessionSubscription = updates
+                .receive(on: DispatchQueue.main)
+                .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] value in
+                    guard let self else { return }
+                    let status = value?.status ?? "missing"
+                    if status != "active" {
+                        Task { await self.handleRemoteLogout() }
+                    }
+                })
+        }
+    }
+
+    private func startUserWatcher() {
+        userSubscription?.cancel()
+        guard let uid = userId else {
+            print("[EA-DEBUG] startUserWatcher: No userId")
+            return
+        }
+        guard self.accessToken != nil else {
+            print("[EA-DEBUG] startUserWatcher: aborted, token missing")
+            return
+        }
+        print("[EA-DEBUG] startUserWatcher: Starting for uid=\(uid), tokenPresent=\(self.accessToken != nil)")
+        Task { [weak self] in
+            guard let self else {
+                print("[EA-DEBUG] startUserWatcher: Self deallocated")
+                return
+            }
+            guard let client = await ensureConvexClient() else {
+                print("[EA-DEBUG] startUserWatcher: Failed to get Convex client, tokenPresent=\(self.accessToken != nil)")
+                return
+            }
+            print("[EA-DEBUG] startUserWatcher: Got Convex client, setting up subscription, tokenPresent=\(self.accessToken != nil)")
+            struct UserDoc: Decodable { struct Props: Decodable { let username: String? }; let properties: Props? }
+            let updates: AnyPublisher<UserDoc?, ClientError> = client.subscribe(
+                to: "auth/users.js:getById",
+                with: [
+                    "id": uid
+                ],
+                yielding: UserDoc?.self
+            )
+            self.userSubscription = updates
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { completion in
+                        print("[EA-DEBUG] startUserWatcher: Subscription completed: \(completion)")
+                    },
+                    receiveValue: { [weak self] value in
+                        let username = value?.properties?.username
+                        print("[EA-DEBUG] startUserWatcher: Received update - username=\(username ?? "nil"), full value: \(String(describing: value))")
+                        DispatchQueue.main.async {
+                            self?.liveUsername = username
+                            print("[EA-DEBUG] startUserWatcher: Updated liveUsername to: \(username ?? "nil")")
+                        }
+                    }
+                )
+            print("[EA-DEBUG] startUserWatcher: Subscription set up successfully")
+
+            // Add a periodic check to see if we're getting initial data
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                print("[EA-DEBUG] startUserWatcher: 2s check - current liveUsername: \(self?.liveUsername ?? "nil")")
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+                print("[EA-DEBUG] startUserWatcher: 5s check - current liveUsername: \(self?.liveUsername ?? "nil")")
+            }
+        }
+    }
+
+    private func startSessionsWatcher() {
+        sessionsSubscription?.cancel()
+        guard let uid = userId else { return }
+        guard self.accessToken != nil else {
+            print("[EA-DEBUG] startSessionsWatcher: aborted, token missing")
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            guard let client = await ensureConvexClient() else { return }
+            let updates: AnyPublisher<[SessionDoc], ClientError> = client.subscribe(
+                to: "auth/sessions.js:getByUser",
+                with: [
+                    "userId": uid
+                ],
+                yielding: [SessionDoc].self
+            )
+            self.sessionsSubscription = updates
+                .receive(on: DispatchQueue.main)
+                .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] value in
+                    self?.liveSessions = value
+                })
+        }
+    }
+
+    private func ensureConvexClient() async -> ConvexClient? {
+        if let existing = convexClient {
+            print("[EA-DEBUG] ensureConvexClient: Using existing client tag=\(convexClientTag ?? "nil"), tokenPresent=\(self.accessToken != nil)")
+            return existing
+        }
+        if let task = clientCreationTask {
+            print("[EA-DEBUG] ensureConvexClient: Awaiting in-flight creation task, tokenPresent=\(self.accessToken != nil)")
+            return await task.value
+        }
+        let task = Task { [weak self] () -> ConvexClient? in
+            guard let self else { return nil }
+            print("[EA-DEBUG] ensureConvexClient: Creating new client, tokenPresent=\(self.accessToken != nil)")
+            do {
+                let data = try await self.get(path: "/api/convex", authorized: false)
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let url = json["convexUrl"] as? String {
+                    print("[EA-DEBUG] ensureConvexClient: Got convex URL: \(url)")
+                    let client = ConvexClient(deploymentUrl: url)
+                    await MainActor.run {
+                        self.convexClient = client
+                        self.convexClientTag = UUID().uuidString.prefix(8).description
+                        print("[EA-DEBUG] ensureConvexClient: Client created successfully tag=\(self.convexClientTag ?? "nil")")
+                    }
+                    return client
+                } else {
+                    print("[EA-DEBUG] ensureConvexClient: Failed to parse convex URL from response")
+                    return nil
+                }
+            } catch {
+                print("[EA-DEBUG] ensureConvexClient: Error getting convex config: \(error)")
+                return nil
+            }
+        }
+        clientCreationTask = task
+        let client = await task.value
+        clientCreationTask = nil
+        return client
+    }
+
+    #if os(macOS)
+    private var macOSPollingTimer: Timer?
+
+    private func startMacOSFallbackPolling() { }
+
+    private func stopMacOSFallbackPolling() { macOSPollingTimer?.invalidate(); macOSPollingTimer = nil }
+
+    private func pollUsernameUpdate() async { }
+    #endif
+
+    // Helper to encode Convex Id argument shape {"$id": "..."}
+    struct ConvexIdArg: ConvexEncodable {
+        let id: String
+        init(_ id: String) { self.id = id }
+        func convexEncode() throws -> String {
+            return "{\"$id\":\"\(id)\"}"
         }
     }
 
@@ -598,12 +702,8 @@ public final class EntityAuth: NSObject, ObservableObject {
         req.httpMethod = method
         headers.forEach { req.addValue($1, forHTTPHeaderField: $0) }
         req.httpBody = body
-        let hasAuth = headers.keys.map { $0.lowercased() }.contains("authorization")
-        log("http -> \(method) \(url.absoluteString) auth=\(hasAuth)")
-        let start = Date()
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw NSError(domain: "EntityAuth", code: 500) }
-        log("request \(method) \(path) -> \(http.statusCode) in \(Int(Date().timeIntervalSince(start)*1000))ms")
         if http.statusCode == 401 {
             // Attempt one refresh + retry
             if allowRetry && !path.hasPrefix("/api/auth/refresh") {
@@ -621,19 +721,18 @@ public final class EntityAuth: NSObject, ObservableObject {
         }
         if !(200...299).contains(http.statusCode) {
             let bodyText = String(data: data, encoding: .utf8) ?? ""
-            if !bodyText.isEmpty { log("error body: \(bodyText)") }
             throw NSError(domain: "EntityAuth", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: bodyText.isEmpty ? "HTTP \(http.statusCode)" : bodyText])
         }
         return data
     }
 
     // MARK: Utilities
-    public func currentDeviceId() -> String? {
+    func currentDeviceId() -> String? {
         return keychainGet("ea_device_id")
     }
 
     @discardableResult
-    public func upsertDevice(name: String?) async -> Bool {
+    func upsertDevice(name: String?) async -> Bool {
         do {
             let did = ensureDeviceId() ?? currentDeviceId() ?? UUID().uuidString.lowercased()
             let body: [String: Any] = [
@@ -643,15 +742,13 @@ public final class EntityAuth: NSObject, ObservableObject {
                 "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
             ]
             _ = try await post(path: "/api/device/upsert", headers: [:], json: body, authorized: true)
-            log("device upsert ok")
             return true
         } catch {
-            log("device upsert error: \(error.localizedDescription)")
             return false
         }
     }
 
-    public func fetchPasskeyStatus() async {
+    func fetchPasskeyStatus() async {
         guard let uid = self.userId else {
             self.passkeyStatus = nil
             return
@@ -667,12 +764,10 @@ public final class EntityAuth: NSObject, ObservableObject {
             self.passkeyStatus = nil
         }
     }
-    public func testConnection() async {
+    func testConnection() async {
         do {
             _ = try await request(method: "GET", path: "/", headers: ["accept": "text/html"], body: nil)
-            log("connectivity: OK -> \(baseURL.absoluteString)")
         } catch {
-            log("connectivity: FAIL -> \(baseURL.absoluteString) error=\(error.localizedDescription)")
         }
     }
 }
@@ -709,7 +804,7 @@ extension EntityAuth {
 
 // MARK: - ASAuthorizationControllerDelegate
 extension EntityAuth: ASAuthorizationControllerDelegate {
-    public func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let reg = authorization.credential as? ASAuthorizationPublicKeyCredentialRegistration {
             pendingRegistration?.resume(returning: reg)
             pendingRegistration = nil
@@ -726,7 +821,7 @@ extension EntityAuth: ASAuthorizationControllerDelegate {
         activeAuthController = nil
     }
 
-    public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         pendingRegistration?.resume(throwing: error)
         pendingAssertion?.resume(throwing: error)
         pendingRegistration = nil
@@ -737,7 +832,7 @@ extension EntityAuth: ASAuthorizationControllerDelegate {
 
 // MARK: - ASAuthorizationControllerPresentationContextProviding
 extension EntityAuth: ASAuthorizationControllerPresentationContextProviding {
-    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         #if os(iOS)
         if let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
