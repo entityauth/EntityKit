@@ -82,7 +82,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         super.init()
     }
 
-    func updateBaseURL(_ urlString: String) {
+    public func updateBaseURL(_ urlString: String) {
         guard let url = URL(string: urlString), url.scheme?.hasPrefix("http") == true else { return }
         self.baseURL = url
         UserDefaults.standard.set(urlString, forKey: baseURLDefaultsKey)
