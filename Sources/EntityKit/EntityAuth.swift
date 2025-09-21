@@ -51,13 +51,13 @@ public final class EntityAuth: NSObject, ObservableObject {
     @Published public private(set) var logs: [String] = []
     
     @Published private(set) var cachedTenantId: String?
-    @Published public private(set) var liveSessions: [SessionDoc] = []
+    
 
     var onLogout: (() -> Void)?
 
     private var sessionSubscription: AnyCancellable?
     private var userSubscription: AnyCancellable?
-    private var sessionsSubscription: AnyCancellable?
+    
     private var convexClient: ConvexClient?
     private var convexClientTag: String?
     private var clientCreationTask: Task<ConvexClient?, Never>?
@@ -65,13 +65,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     private var tenantFetchInFlight = false
     
 
-    public struct SessionDoc: Decodable, Equatable {
-        public let _id: String?
-        public let status: String?
-        public let deviceId: String?
-        public struct Device: Decodable, Equatable { public let userAgent: String?; public let ip: String?; public let platform: String? }
-        public let device: Device?
-    }
+    
 
     private override init() {
         let initial = UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com"
@@ -97,9 +91,7 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     public func login(email: String, password: String, tenantId: String) async throws {
         let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
-        var headers: [String: String] = ["x-client": "native"]
-        if let did = ensureDeviceId() { headers["x-device-uuid"] = did }
-        headers["x-device-platform"] = platformHeader()
+        let headers: [String: String] = ["x-client": "native"]
         let data = try await post(path: "/api/auth/login", headers: headers, json: body, authorized: false)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         guard
@@ -114,19 +106,8 @@ public final class EntityAuth: NSObject, ObservableObject {
         print("[EA-DEBUG] login: access token set? \(self.accessToken != nil)")
         self.sessionId = sid
         self.userId = uid
-        // Upsert device entity
-        if let did = keychainGet("ea_device_id") {
-            _ = try? await post(path: "/api/device/upsert", headers: [:], json: [
-                "uuid": did,
-                "platform": platformHeader(),
-                "name": deviceName(),
-                "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-            ], authorized: true)
-        }
         print("[EA-DEBUG] login: starting watchers with token? \(self.accessToken != nil)")
-        startSessionWatcher()
         startUserWatcher()
-        startSessionsWatcher()
         // Eagerly populate profile fields for immediate UI
         Task { await self.fetchCurrentUserProfile() }
     }
@@ -136,8 +117,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         if let refreshToken = keychainGet("ea_refresh") { req.addValue(refreshToken, forHTTPHeaderField: "x-refresh-token") }
-        if let did = keychainGet("ea_device_id") { req.addValue(did, forHTTPHeaderField: "x-device-uuid") }
-        req.addValue(platformHeader(), forHTTPHeaderField: "x-device-platform")
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw NSError(domain: "EntityAuth", code: 500) }
         if http.statusCode == 401 { throw URLError(.userAuthenticationRequired) }
@@ -162,13 +141,12 @@ public final class EntityAuth: NSObject, ObservableObject {
         self.sessionId = nil
         self.userId = nil
         self.liveUsername = nil
-        self.liveSessions = []
+        
         sessionSubscription?.cancel()
         sessionSubscription = nil
         userSubscription?.cancel()
         userSubscription = nil
-        sessionsSubscription?.cancel()
-        sessionsSubscription = nil
+        
         // Clear Convex client on logout
         self.convexClient = nil
         #if os(macOS)
@@ -201,40 +179,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
     }
 
-    // MARK: - Sessions helpers
-    public func getCurrentSession() async throws -> [String: Any]? {
-        let data = try await get(path: "/api/session/current", authorized: true)
-        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
-    }
-
-    public func listSessions() async throws -> [SessionDoc] {
-        let data = try await request(method: "GET", path: "/api/session/list", headers: authHeader(), body: nil)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let arr = json?["sessions"] as? [[String: Any]] ?? []
-        let decoded: [SessionDoc] = try JSONDecoder().decode([SessionDoc].self, from: try JSONSerialization.data(withJSONObject: arr))
-        return decoded
-    }
-
-    public func sessionById(_ sessionId: String) async throws -> [String: Any]? {
-        let body: [String: Any] = ["sessionId": sessionId]
-        let data = try await post(path: "/api/session/by-id", headers: [:], json: body, authorized: true)
-        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
-    }
-
-    public func revokeSession(sessionId: String) async throws {
-        let body: [String: Any] = ["sessionId": sessionId]
-        _ = try await post(path: "/api/session/revoke", headers: [:], json: body, authorized: true)
-    }
-
-    public func revokeByDevice(deviceId: String) async throws {
-        let body: [String: Any] = ["deviceId": deviceId]
-        _ = try await post(path: "/api/session/revoke-by-device", headers: [:], json: body, authorized: true)
-    }
-
-    public func revokeByUser(userId: String) async throws {
-        let body: [String: Any] = ["userId": userId]
-        _ = try await post(path: "/api/session/revoke-by-user", headers: [:], json: body, authorized: true)
-    }
+    // Sessions management APIs removed
 
     // Passkey-related APIs have been removed
 
@@ -291,17 +236,12 @@ public final class EntityAuth: NSObject, ObservableObject {
         }
         tenantFetchInFlight = true
         defer { tenantFetchInFlight = false; lastTenantFetchAt = Date() }
-        do {
-            let data = try await get(path: "/api/session/current", authorized: true)
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let sess = json["session"] as? [String: Any] {
-                if let tid = sess["tid"] as? String { cachedTenantId = tid; return tid }
-                if let tidNum = sess["tid"] as? NSNumber { let s = tidNum.stringValue; cachedTenantId = s; return s }
-            }
-            return cachedTenantId
-        } catch {
-            return cachedTenantId
+        // Prefer decoding from access token to avoid HTTP dependency
+        if let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
+            cachedTenantId = tid
+            return tid
         }
+        return cachedTenantId
     }
 
     
@@ -405,30 +345,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         }
     }
 
-    private func startSessionsWatcher() {
-        sessionsSubscription?.cancel()
-        guard let uid = userId else { return }
-        guard self.accessToken != nil else {
-            print("[EA-DEBUG] startSessionsWatcher: aborted, token missing")
-            return
-        }
-        Task { [weak self] in
-            guard let self else { return }
-            guard let client = await ensureConvexClient() else { return }
-            let updates: AnyPublisher<[SessionDoc], ClientError> = client.subscribe(
-                to: "auth/sessions.js:getByUser",
-                with: [
-                    "userId": uid
-                ],
-                yielding: [SessionDoc].self
-            )
-            self.sessionsSubscription = updates
-                .receive(on: DispatchQueue.main)
-                .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] value in
-                    self?.liveSessions = value
-                })
-        }
-    }
+    
 
     private func ensureConvexClient() async -> ConvexClient? {
         if let existing = convexClient {
@@ -545,26 +462,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: Utilities
-    public func currentDeviceId() -> String? {
-        return keychainGet("ea_device_id")
-    }
-
-    @discardableResult
-    public func upsertDevice(name: String?) async -> Bool {
-        do {
-            let did = ensureDeviceId() ?? currentDeviceId() ?? UUID().uuidString.lowercased()
-            let body: [String: Any] = [
-                "uuid": did,
-                "platform": platformHeader(),
-                "name": (name?.isEmpty == false ? name! : deviceName()),
-                "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-            ]
-            _ = try await post(path: "/api/device/upsert", headers: [:], json: body, authorized: true)
-            return true
-        } catch {
-            return false
-        }
-    }
+    
 
     
     public func testConnection() async {
@@ -577,31 +475,15 @@ public final class EntityAuth: NSObject, ObservableObject {
 
 // MARK: - Device helpers
 extension EntityAuth {
-    private func platformHeader() -> String {
-        #if os(iOS)
-        return "ios"
-        #elseif os(macOS)
-        return "macos"
-        #else
-        return "unknown"
-        #endif
-    }
-
-    private func ensureDeviceId() -> String? {
-        if let existing = keychainGet("ea_device_id"), !existing.isEmpty { return existing }
-        let newId = UUID().uuidString.lowercased()
-        keychainSet("ea_device_id", newId)
-        return newId
-    }
-
-    private func deviceName() -> String {
-        #if os(iOS)
-        return UIDevice.current.name
-        #elseif os(macOS)
-        return Host.current().localizedName ?? "Mac"
-        #else
-        return "Unknown"
-        #endif
+    private static func decodeTenantId(fromJWT token: String) -> String? {
+        let parts = token.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        let payloadB64 = String(parts[1])
+        guard let data = Data(base64URLEncoded: payloadB64),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        if let tid = json["tid"] as? String { return tid }
+        if let tidNum = json["tid"] as? NSNumber { return tidNum.stringValue }
+        return nil
     }
 }
 
