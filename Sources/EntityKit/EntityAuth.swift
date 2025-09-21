@@ -56,6 +56,8 @@ public final class EntityAuth: NSObject, ObservableObject {
     @Published public private(set) var sessionId: String?
     @Published public private(set) var userId: String?
     @Published public private(set) var liveUsername: String?
+    @Published public private(set) var liveOrganizations: [LiveOrganization]? = nil
+    public var liveOrganizationsPublisher: AnyPublisher<[LiveOrganization]?, Never> { $liveOrganizations.eraseToAnyPublisher() }
     @Published public private(set) var logs: [String] = []
     
     @Published private(set) var cachedTenantId: String?
@@ -65,6 +67,7 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     private var sessionSubscription: AnyCancellable?
     private var userSubscription: AnyCancellable?
+    private var orgsSubscription: AnyCancellable?
     
     private var convexClient: ConvexClient?
     private var convexClientTag: String?
@@ -116,6 +119,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         self.userId = uid
         print("[EA-DEBUG] login: starting watchers with token? \(self.accessToken != nil)")
         startUserWatcher()
+        startOrganizationsWatcher()
         // Eagerly populate profile fields for immediate UI
         Task { await self.fetchCurrentUserProfile() }
     }
@@ -156,6 +160,8 @@ public final class EntityAuth: NSObject, ObservableObject {
         sessionSubscription = nil
         userSubscription?.cancel()
         userSubscription = nil
+        orgsSubscription?.cancel()
+        orgsSubscription = nil
         
         // Clear Convex client on logout
         self.convexClient = nil
@@ -165,6 +171,15 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: - Organizations
+    public struct LiveOrganization: Identifiable, Hashable, Codable {
+        public let id: String
+        public let name: String
+        public let slug: String
+        public let role: String
+        public let memberCount: Int?
+        public let joinedAtMs: Double
+        public let createdAtMs: Double
+    }
     public func createOrg(tenantId: String, name: String, slug: String, ownerId: String) async throws {
         let body: [String: Any] = [
             "tenantId": tenantId,
@@ -367,6 +382,65 @@ public final class EntityAuth: NSObject, ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
                 print("[EA-DEBUG] startUserWatcher: 5s check - current liveUsername: \(self?.liveUsername ?? "nil")")
             }
+        }
+    }
+
+    private func startOrganizationsWatcher() {
+        orgsSubscription?.cancel()
+        guard let uid = userId else {
+            print("[EA-DEBUG] startOrganizationsWatcher: No userId")
+            return
+        }
+        guard self.accessToken != nil else {
+            print("[EA-DEBUG] startOrganizationsWatcher: aborted, token missing")
+            return
+        }
+        print("[EA-DEBUG] startOrganizationsWatcher: Starting for uid=\(uid), tokenPresent=\(self.accessToken != nil)")
+        Task { [weak self] in
+            guard let self else {
+                print("[EA-DEBUG] startOrganizationsWatcher: Self deallocated")
+                return
+            }
+            guard let client = await ensureConvexClient() else {
+                print("[EA-DEBUG] startOrganizationsWatcher: Failed to get Convex client, tokenPresent=\(self.accessToken != nil)")
+                return
+            }
+            struct OrgItem: Decodable {
+                struct OrgDoc: Decodable { struct Props: Decodable { let name: String?; let slug: String?; let memberCount: Int? }; let _id: String?; let properties: Props?; let createdAt: Double? }
+                let organization: OrgDoc?
+                let role: String?
+                let joinedAt: Double?
+            }
+            let updates: AnyPublisher<[OrgItem]?, ClientError> = client.subscribe(
+                to: "memberships.js:getOrganizationsForUser",
+                with: [
+                    "userId": ConvexIdArg(uid)
+                ],
+                yielding: [OrgItem]?.self
+            )
+            self.orgsSubscription = updates
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { completion in
+                        print("[EA-DEBUG] startOrganizationsWatcher: Subscription completed: \(completion)")
+                    },
+                    receiveValue: { [weak self] value in
+                        guard let self else { return }
+                        let mapped: [LiveOrganization] = (value ?? []).compactMap { item in
+                            guard let doc = item.organization, let id = doc._id else { return nil }
+                            let name = doc.properties?.name ?? ""
+                            let slug = doc.properties?.slug ?? ""
+                            let role = item.role ?? "member"
+                            let memberCount = doc.properties?.memberCount
+                            let joinedAtMs = item.joinedAt ?? 0
+                            let createdAtMs = doc.createdAt ?? 0
+                            return LiveOrganization(id: id, name: name, slug: slug, role: role, memberCount: memberCount, joinedAtMs: joinedAtMs, createdAtMs: createdAtMs)
+                        }
+                        self.liveOrganizations = mapped
+                        print("[EA-DEBUG] startOrganizationsWatcher: liveOrganizations count=\(mapped.count)")
+                    }
+                )
+            print("[EA-DEBUG] startOrganizationsWatcher: Subscription set up successfully")
         }
     }
 
