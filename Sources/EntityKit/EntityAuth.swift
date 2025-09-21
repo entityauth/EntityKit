@@ -35,6 +35,14 @@ private func keychainGet(_ key: String) -> String? {
     return String(data: data, encoding: .utf8)
 }
 
+private func keychainDelete(_ key: String) {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrAccount as String: key,
+    ]
+    SecItemDelete(query as CFDictionary)
+}
+
 // MARK: - Shared EntityAuth client
 @MainActor
 public final class EntityAuth: NSObject, ObservableObject {
@@ -137,6 +145,8 @@ public final class EntityAuth: NSObject, ObservableObject {
         } else {
             _ = try? await post(path: "/api/auth/logout", headers: [:], json: [:], authorized: false)
         }
+        // Explicitly remove locally stored refresh token
+        keychainDelete("ea_refresh")
         self.accessToken = nil
         self.sessionId = nil
         self.userId = nil
@@ -177,6 +187,11 @@ public final class EntityAuth: NSObject, ObservableObject {
     public func switchOrg(orgId: String) async throws {
         let body: [String: Any] = ["orgId": orgId]
         _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
+    }
+
+    public func getUserOrganizations() async throws -> [String: Any] {
+        let data = try await get(path: "/api/org/user", authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
     }
 
 
