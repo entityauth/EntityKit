@@ -187,6 +187,10 @@ public final class EntityAuth: NSObject, ObservableObject {
     public func switchOrg(orgId: String) async throws {
         let body: [String: Any] = ["orgId": orgId]
         _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
+        // After switching org, refresh to obtain a new access token with updated tenant (tid)
+        // and clear cached tenant so subsequent reads reflect the new org immediately
+        self.cachedTenantId = nil
+        try await refresh()
     }
 
     public func getUserOrganizations() async throws -> [String: Any] {
@@ -252,6 +256,15 @@ public final class EntityAuth: NSObject, ObservableObject {
         if let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
             cachedTenantId = tid
             return tid
+        }
+        // Fallback to server-side session: mirrors web SDK behavior
+        do {
+            if let me = try await getUserMe(), let tid = me["tenantId"] as? String, !tid.isEmpty {
+                cachedTenantId = tid
+                return tid
+            }
+        } catch {
+            // best-effort; ignore errors here
         }
         return cachedTenantId
     }
