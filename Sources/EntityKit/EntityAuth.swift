@@ -190,7 +190,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     public func getUserOrganizations() async throws -> [String: Any] {
-        let data = try await get(path: "/api/org/user", authorized: true)
+        let data = try await get(path: "/api/org/list", authorized: true)
         return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
     }
 
