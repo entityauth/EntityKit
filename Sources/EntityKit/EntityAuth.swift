@@ -179,9 +179,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
     }
 
-    // Sessions management APIs removed
-
-    // Passkey-related APIs have been removed
 
     // MARK: - Username APIs
     public func setUsername(_ username: String) async throws {
