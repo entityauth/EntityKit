@@ -389,13 +389,16 @@ public final class EntityAuth: NSObject, ObservableObject {
         orgsSubscription?.cancel()
         guard let uid = userId else {
             print("[EA-DEBUG] startOrganizationsWatcher: No userId")
+            self.logs.append("startOrganizationsWatcher: No userId")
             return
         }
         guard self.accessToken != nil else {
             print("[EA-DEBUG] startOrganizationsWatcher: aborted, token missing")
+            self.logs.append("startOrganizationsWatcher: aborted, token missing")
             return
         }
         print("[EA-DEBUG] startOrganizationsWatcher: Starting for uid=\(uid), tokenPresent=\(self.accessToken != nil)")
+        self.logs.append("startOrganizationsWatcher: starting for uid=\(uid)")
         Task { [weak self] in
             guard let self else {
                 print("[EA-DEBUG] startOrganizationsWatcher: Self deallocated")
@@ -403,8 +406,10 @@ public final class EntityAuth: NSObject, ObservableObject {
             }
             guard let client = await ensureConvexClient() else {
                 print("[EA-DEBUG] startOrganizationsWatcher: Failed to get Convex client, tokenPresent=\(self.accessToken != nil)")
+                self.logs.append("startOrganizationsWatcher: Failed to get Convex client")
                 return
             }
+            self.logs.append("startOrganizationsWatcher: Subscribing to memberships.js:getOrganizationsForUser")
             struct OrgItem: Decodable {
                 struct OrgDoc: Decodable { struct Props: Decodable { let name: String?; let slug: String?; let memberCount: Int? }; let _id: String?; let properties: Props?; let createdAt: Double? }
                 let organization: OrgDoc?
@@ -414,7 +419,7 @@ public final class EntityAuth: NSObject, ObservableObject {
             let updates: AnyPublisher<[OrgItem]?, ClientError> = client.subscribe(
                 to: "memberships.js:getOrganizationsForUser",
                 with: [
-                    "userId": ConvexIdArg(uid)
+                    "userId": uid
                 ],
                 yielding: [OrgItem]?.self
             )
@@ -423,6 +428,7 @@ public final class EntityAuth: NSObject, ObservableObject {
                 .sink(
                     receiveCompletion: { completion in
                         print("[EA-DEBUG] startOrganizationsWatcher: Subscription completed: \(completion)")
+                        self.logs.append("startOrganizationsWatcher: completion=\(completion)")
                     },
                     receiveValue: { [weak self] value in
                         guard let self else { return }
@@ -438,9 +444,11 @@ public final class EntityAuth: NSObject, ObservableObject {
                         }
                         self.liveOrganizations = mapped
                         print("[EA-DEBUG] startOrganizationsWatcher: liveOrganizations count=\(mapped.count)")
+                        self.logs.append("startOrganizationsWatcher: update count=\(mapped.count)")
                     }
                 )
             print("[EA-DEBUG] startOrganizationsWatcher: Subscription set up successfully")
+            self.logs.append("startOrganizationsWatcher: subscription set up")
         }
     }
 
