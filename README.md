@@ -23,21 +23,14 @@ import EntityKit
 func signIn() async {
     do {
         try await EntityAuth.shared.login(email: "alice@example.com", password: "P@ssw0rd!", tenantId: "t1")
-        // Use EntityAuth.shared API for authorized calls or passkey flows below
+        // Use EntityAuth.shared API for authorized calls
     } catch {
         print("Login failed: \(error)")
     }
 }
 ```
 
-### Passkeys
-```swift
-// Register with email (auto-create user if missing)
-try await EntityAuth.shared.passkeyRegister(email: "alice@example.com", tenantId: "t1")
-
-// Sign in with passkey
-try await EntityAuth.shared.passkeyLogin(email: "alice@example.com", tenantId: "t1")
-```
+ 
 
 ### Username APIs
 ```swift

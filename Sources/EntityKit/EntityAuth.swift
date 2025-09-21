@@ -3,7 +3,7 @@ import Security
 import SwiftUI
 import Combine
 import ConvexMobile
-import AuthenticationServices
+ 
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
@@ -49,8 +49,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     @Published public private(set) var userId: String?
     @Published public private(set) var liveUsername: String?
     @Published public private(set) var logs: [String] = []
-    @Published public private(set) var isPasskeyBusy: Bool = false
-    @Published private(set) var passkeyStatus: (rpId: String, count: Int)?
+    
     @Published private(set) var cachedTenantId: String?
     @Published public private(set) var liveSessions: [SessionDoc] = []
 
@@ -64,9 +63,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     private var clientCreationTask: Task<ConvexClient?, Never>?
     private var lastTenantFetchAt: Date?
     private var tenantFetchInFlight = false
-    private var activeAuthController: ASAuthorizationController?
-    private var pendingRegistration: CheckedContinuation<ASAuthorizationPublicKeyCredentialRegistration, Error>?
-    private var pendingAssertion: CheckedContinuation<ASAuthorizationPublicKeyCredentialAssertion, Error>?
+    
 
     public struct SessionDoc: Decodable, Equatable {
         public let _id: String?
@@ -239,238 +236,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         _ = try await post(path: "/api/session/revoke-by-user", headers: [:], json: body, authorized: true)
     }
 
-    // MARK: - Passkeys
-    public func passkeyRegister(username: String) async throws {
-        if isPasskeyBusy {
-            return
-        }
-        isPasskeyBusy = true
-        defer { isPasskeyBusy = false }
-        guard let uid = self.userId else {
-            throw NSError(domain: "EntityAuth", code: 700, userInfo: [NSLocalizedDescriptionKey: "Login required before creating a passkey"])
-        }
-        let data = try await post(path: "/api/passkey/register/options", headers: ["x-client": "native"], json: ["userId": uid, "username": username], authorized: true)
-        // Parse options (legacy internal API kept for backwards compat of this overload)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let options = json["options"] as? [String: Any],
-              let challengeB64u = options["challenge"] as? String,
-              let rp = options["rp"] as? [String: Any],
-              let rpId = rp["id"] as? String,
-              let user = options["user"] as? [String: Any],
-              let userIdB64u = user["id"] as? String
-        else { throw NSError(domain: "EntityAuth", code: 701, userInfo: [NSLocalizedDescriptionKey: "Invalid register options response"]) }
-
-        guard let challenge = Data(base64URLEncoded: challengeB64u), let userIdBytes = Data(base64URLEncoded: userIdB64u) else {
-            throw NSError(domain: "EntityAuth", code: 702, userInfo: [NSLocalizedDescriptionKey: "Invalid challenge or user id encoding"])
-        }
-
-        let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
-        let request = provider.createCredentialRegistrationRequest(challenge: challenge, name: username, userID: userIdBytes)
-        request.userVerificationPreference = .preferred
-
-        let registration: ASAuthorizationPublicKeyCredentialRegistration
-        do {
-            registration = try await performPasskeyRegistration(request: request)
-        } catch let nsError as NSError {
-            throw nsError
-        }
-
-        // Build RegistrationResponseJSON
-        let credId = registration.credentialID.base64URLEncodedString()
-        let clientData = registration.rawClientDataJSON.base64URLEncodedString()
-        guard let rawAttestation = registration.rawAttestationObject else {
-            throw NSError(domain: "EntityAuth", code: 703, userInfo: [NSLocalizedDescriptionKey: "Missing attestation object from registration"]) }
-        let attestation = rawAttestation.base64URLEncodedString()
-
-        let response: [String: Any] = [
-            "id": credId,
-            "rawId": credId,
-            "type": "public-key",
-            "response": [
-                "attestationObject": attestation,
-                "clientDataJSON": clientData,
-            ],
-            "clientExtensionResults": [:],
-            "authenticatorAttachment": "platform",
-        ]
-
-        _ = try await post(path: "/api/passkey/register/verify", headers: ["x-client": "native"], json: ["userId": uid, "response": response], authorized: true)
-    }
-
-    // New email-based registration flow: auto-creates user if missing and auto-logs-in on verify
-    public func passkeyRegister(email: String, tenantId: String = "t1") async throws {
-        if isPasskeyBusy {
-            return
-        }
-        isPasskeyBusy = true
-        defer { isPasskeyBusy = false }
-
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedEmail.isEmpty else {
-            throw NSError(domain: "EntityAuth", code: 704, userInfo: [NSLocalizedDescriptionKey: "Email is required for passkey registration"])
-        }
-        let data = try await post(path: "/api/passkey/register/options", headers: ["x-client": "native"], json: ["tenantId": tenantId, "email": trimmedEmail], authorized: false)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let options = json["options"] as? [String: Any],
-              let challengeB64u = options["challenge"] as? String,
-              let rp = options["rp"] as? [String: Any],
-              let rpId = rp["id"] as? String,
-              let user = options["user"] as? [String: Any],
-              let userIdB64u = user["id"] as? String,
-              let uid = json["userId"] as? String
-        else { throw NSError(domain: "EntityAuth", code: 705, userInfo: [NSLocalizedDescriptionKey: "Invalid register options response"]) }
-
-        guard let challenge = Data(base64URLEncoded: challengeB64u), let userIdBytes = Data(base64URLEncoded: userIdB64u) else {
-            throw NSError(domain: "EntityAuth", code: 706, userInfo: [NSLocalizedDescriptionKey: "Invalid challenge or user id encoding"])
-        }
-
-        let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
-        let request = provider.createCredentialRegistrationRequest(challenge: challenge, name: trimmedEmail, userID: userIdBytes)
-        request.userVerificationPreference = .preferred
-
-        let registration: ASAuthorizationPublicKeyCredentialRegistration
-        do {
-            registration = try await performPasskeyRegistration(request: request)
-        } catch let nsError as NSError {
-            throw nsError
-        }
-
-        let credId = registration.credentialID.base64URLEncodedString()
-        let clientData = registration.rawClientDataJSON.base64URLEncodedString()
-        guard let rawAttestation = registration.rawAttestationObject else {
-            throw NSError(domain: "EntityAuth", code: 707, userInfo: [NSLocalizedDescriptionKey: "Missing attestation object from registration"]) }
-        let attestation = rawAttestation.base64URLEncodedString()
-
-        let response: [String: Any] = [
-            "id": credId,
-            "rawId": credId,
-            "type": "public-key",
-            "response": [
-                "attestationObject": attestation,
-                "clientDataJSON": clientData,
-            ],
-            "clientExtensionResults": [:],
-            "authenticatorAttachment": "platform",
-        ]
-
-        var headers: [String: String] = ["x-client": "native"]
-        if let did = ensureDeviceId() { headers["x-device-uuid"] = did }
-        headers["x-device-platform"] = platformHeader()
-        let verifyData = try await post(path: "/api/passkey/register/verify", headers: headers, json: ["userId": uid, "response": response], authorized: false)
-        let verified = try JSONSerialization.jsonObject(with: verifyData) as? [String: Any]
-        guard let access = verified?["accessToken"] as? String,
-              let refresh = verified?["refreshToken"] as? String,
-              let sid = verified?["sessionId"] as? String,
-              let userId = verified?["userId"] as? String else {
-            throw NSError(domain: "EntityAuth", code: 708, userInfo: [NSLocalizedDescriptionKey: "Invalid register verify response"])
-        }
-
-        keychainSet("ea_refresh", refresh)
-        self.accessToken = access
-        self.sessionId = sid
-        self.userId = userId
-        if let did = keychainGet("ea_device_id") {
-            _ = try? await post(path: "/api/device/upsert", headers: [:], json: [
-                "uuid": did,
-                "platform": platformHeader(),
-                "name": deviceName(),
-                "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-            ], authorized: true)
-        }
-        startSessionWatcher()
-        startUserWatcher()
-        startSessionsWatcher()
-        // Eagerly populate profile fields for immediate UI
-        Task { await self.fetchCurrentUserProfile() }
-    }
-
-    public func passkeyLogin(email: String, tenantId: String) async throws {
-        if isPasskeyBusy {
-            return
-        }
-        isPasskeyBusy = true
-        defer { isPasskeyBusy = false }
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedEmail.isEmpty else {
-            throw NSError(domain: "EntityAuth", code: 709, userInfo: [NSLocalizedDescriptionKey: "Email is required for passkey sign-in"])
-        }
-        let data = try await post(path: "/api/passkey/login/options", headers: ["x-client": "native"], json: ["tenantId": tenantId, "email": trimmedEmail], authorized: false)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let options = json["options"] as? [String: Any],
-              let challengeB64u = options["challenge"] as? String
-        else { throw NSError(domain: "EntityAuth", code: 711, userInfo: [NSLocalizedDescriptionKey: "Invalid login options response"]) }
-
-        let serverRpId = json["rpId"] as? String
-        let rpId = (options["rpId"] as? String) ?? serverRpId ?? (URL(string: persistedBaseURL)?.host ?? "")
-        guard let challenge = Data(base64URLEncoded: challengeB64u), !rpId.isEmpty else {
-            throw NSError(domain: "EntityAuth", code: 712, userInfo: [NSLocalizedDescriptionKey: "Invalid rpId or challenge"])
-        }
-
-        guard let uid = json["userId"] as? String else {
-            throw NSError(domain: "EntityAuth", code: 714, userInfo: [NSLocalizedDescriptionKey: "Missing userId in options response"])
-        }
-
-        let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
-        let request = provider.createCredentialAssertionRequest(challenge: challenge)
-        request.userVerificationPreference = .preferred
-
-        let assertion: ASAuthorizationPublicKeyCredentialAssertion
-        do {
-            assertion = try await performPasskeyAssertion(request: request)
-        } catch let nsError as NSError {
-            throw nsError
-        }
-
-        let credId = assertion.credentialID.base64URLEncodedString()
-        let clientData = assertion.rawClientDataJSON.base64URLEncodedString()
-        let authData = assertion.rawAuthenticatorData.base64URLEncodedString()
-        let signature = assertion.signature.base64URLEncodedString()
-        let userHandle = assertion.userID.isEmpty ? nil : assertion.userID.base64URLEncodedString()
-
-        var response: [String: Any] = [
-            "id": credId,
-            "rawId": credId,
-            "type": "public-key",
-            "response": [
-                "authenticatorData": authData,
-                "clientDataJSON": clientData,
-                "signature": signature,
-            ],
-            "clientExtensionResults": [:],
-            "authenticatorAttachment": "platform",
-        ]
-        if let userHandle { (response["response"] as? [String: Any]).map { _ in } ; var resp = response["response"] as! [String: Any]; resp["userHandle"] = userHandle; response["response"] = resp }
-
-        var headers: [String: String] = ["x-client": "native"]
-        if let did = ensureDeviceId() { headers["x-device-uuid"] = did }
-        headers["x-device-platform"] = platformHeader()
-        let verifyData = try await post(path: "/api/passkey/login/verify", headers: headers, json: ["userId": uid, "response": response], authorized: false)
-        let verified = try JSONSerialization.jsonObject(with: verifyData) as? [String: Any]
-        guard let access = verified?["accessToken"] as? String,
-              let refresh = verified?["refreshToken"] as? String,
-              let sid = verified?["sessionId"] as? String,
-              let userId = verified?["userId"] as? String else {
-            throw NSError(domain: "EntityAuth", code: 713, userInfo: [NSLocalizedDescriptionKey: "Invalid login verify response"])
-        }
-
-        keychainSet("ea_refresh", refresh)
-        self.accessToken = access
-        self.sessionId = sid
-        self.userId = userId
-        // Upsert device entity
-        if let did = keychainGet("ea_device_id") {
-            _ = try? await post(path: "/api/device/upsert", headers: [:], json: [
-                "uuid": did,
-                "platform": platformHeader(),
-                "name": deviceName(),
-                "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-            ], authorized: true)
-        }
-        startSessionWatcher()
-        startUserWatcher()
-        // Eagerly populate profile fields for immediate UI
-        Task { await self.fetchCurrentUserProfile() }
-    }
+    // Passkey-related APIs have been removed
 
     // MARK: - Username APIs
     public func setUsername(_ username: String) async throws {
@@ -538,33 +304,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         }
     }
 
-    private func performPasskeyRegistration(request: ASAuthorizationPlatformPublicKeyCredentialRegistrationRequest) async throws -> ASAuthorizationPublicKeyCredentialRegistration {
-        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<ASAuthorizationPublicKeyCredentialRegistration, Error>) in
-            self.pendingRegistration = cont
-            let controller = ASAuthorizationController(authorizationRequests: [request])
-            controller.delegate = self
-            controller.presentationContextProvider = self
-            self.activeAuthController = controller
-            #if os(macOS)
-            NSApp.activate(ignoringOtherApps: true)
-            #endif
-            controller.performRequests()
-        }
-    }
-
-    private func performPasskeyAssertion(request: ASAuthorizationPlatformPublicKeyCredentialAssertionRequest) async throws -> ASAuthorizationPublicKeyCredentialAssertion {
-        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<ASAuthorizationPublicKeyCredentialAssertion, Error>) in
-            self.pendingAssertion = cont
-            let controller = ASAuthorizationController(authorizationRequests: [request])
-            controller.delegate = self
-            controller.presentationContextProvider = self
-            self.activeAuthController = controller
-            #if os(macOS)
-            NSApp.activate(ignoringOtherApps: true)
-            #endif
-            controller.performRequests()
-        }
-    }
+    
 
     // MARK: - Internal
     private func fetchCurrentUserProfile() async {
@@ -826,22 +566,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         }
     }
 
-    public func fetchPasskeyStatus() async {
-        guard let uid = self.userId else {
-            self.passkeyStatus = nil
-            return
-        }
-        do {
-            let data = try await post(path: "/api/passkey/exists", headers: ["x-client": "native"], json: ["userId": uid], authorized: true)
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let rp = json["rpId"] as? String,
-               let count = json["count"] as? Int {
-                self.passkeyStatus = (rpId: rp, count: count)
-            }
-        } catch {
-            self.passkeyStatus = nil
-        }
-    }
+    
     public func testConnection() async {
         do {
             _ = try await request(method: "GET", path: "/", headers: ["accept": "text/html"], body: nil)
@@ -880,68 +605,7 @@ extension EntityAuth {
     }
 }
 
-// MARK: - ASAuthorizationControllerDelegate
-extension EntityAuth: ASAuthorizationControllerDelegate {
-    public func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        if let reg = authorization.credential as? ASAuthorizationPublicKeyCredentialRegistration {
-            pendingRegistration?.resume(returning: reg)
-            pendingRegistration = nil
-        } else if let assertion = authorization.credential as? ASAuthorizationPublicKeyCredentialAssertion {
-            pendingAssertion?.resume(returning: assertion)
-            pendingAssertion = nil
-        } else {
-            let err = NSError(domain: "EntityAuth", code: 720, userInfo: [NSLocalizedDescriptionKey: "Unknown credential type"])
-            pendingRegistration?.resume(throwing: err)
-            pendingAssertion?.resume(throwing: err)
-            pendingRegistration = nil
-            pendingAssertion = nil
-        }
-        activeAuthController = nil
-    }
-
-    public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        pendingRegistration?.resume(throwing: error)
-        pendingAssertion?.resume(throwing: error)
-        pendingRegistration = nil
-        pendingAssertion = nil
-        activeAuthController = nil
-    }
-}
-
-// MARK: - ASAuthorizationControllerPresentationContextProviding
-extension EntityAuth: ASAuthorizationControllerPresentationContextProviding {
-    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        #if os(iOS)
-        if let scene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first {
-            if let win = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first {
-                return win
-            }
-            // Fallback: create a temporary window attached to the scene to satisfy API
-            return UIWindow(windowScene: scene)
-        }
-        // Last resort: return the first app window if any
-        if let anyWindow = (UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }).first {
-            return anyWindow
-        }
-        // Should not happen in normal app lifecycle; crash to avoid deprecated empty init
-        preconditionFailure("No presentation anchor available")
-        #elseif os(macOS)
-        if let anchor = NSApplication.shared.keyWindow
-            ?? NSApplication.shared.mainWindow
-            ?? NSApplication.shared.windows.first(where: { $0.isVisible }) {
-            return anchor
-        }
-        // Fallback to any existing window; avoid returning a detached window
-        return NSApplication.shared.windows.first ?? NSWindow()
-        #else
-        return ASPresentationAnchor()
-        #endif
-    }
-}
+ 
 
 // MARK: - Base64URL helpers
 private extension Data {
