@@ -205,20 +205,32 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     public func switchOrg(orgId: String) async throws {
         let body: [String: Any] = ["orgId": orgId]
-        print("[EA-DEBUG] switchOrg: request orgId=\(orgId)")
-        self.logs.append("switchOrg: request orgId=\(orgId)")
-        _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
-        // After switching org, refresh to obtain a new access token with updated tenant (tid)
-        // and clear cached tenant so subsequent reads reflect the new org immediately
-        self.cachedTenantId = nil
-        self.lastTenantFetchAt = nil // Clear throttle to allow immediate fresh fetch
-        try await refresh()
-        if let token = self.accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
-            print("[EA-DEBUG] switchOrg: refreshed token tid=\(tid)")
-            self.logs.append("switchOrg: refreshed token tid=\(tid)")
-        } else {
-            print("[EA-DEBUG] switchOrg: refreshed token but no tid decoded")
-            self.logs.append("switchOrg: refreshed token but no tid decoded")
+        print("[EA-DEBUG] switchOrg: START request orgId=\(orgId)")
+        self.logs.append("switchOrg: START request orgId=\(orgId)")
+
+        do {
+            let data = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
+            print("[EA-DEBUG] switchOrg: POST success for orgId=\(orgId), response size=\(data.count)")
+            self.logs.append("switchOrg: POST success for orgId=\(orgId)")
+
+            // After switching org, refresh to obtain a new access token with updated tenant (tid)
+            // and clear cached tenant so subsequent reads reflect the new org immediately
+            self.cachedTenantId = nil
+            print("[EA-DEBUG] switchOrg: calling refresh for orgId=\(orgId)")
+            try await refresh()
+            print("[EA-DEBUG] switchOrg: refresh completed for orgId=\(orgId)")
+
+            if let token = self.accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
+                print("[EA-DEBUG] switchOrg: SUCCESS orgId=\(orgId) -> tid=\(tid)")
+                self.logs.append("switchOrg: SUCCESS orgId=\(orgId) -> tid=\(tid)")
+            } else {
+                print("[EA-DEBUG] switchOrg: WARNING orgId=\(orgId) refresh succeeded but no tid decoded")
+                self.logs.append("switchOrg: WARNING orgId=\(orgId) no tid decoded")
+            }
+        } catch {
+            print("[EA-DEBUG] switchOrg: ERROR orgId=\(orgId) error=\(error)")
+            self.logs.append("switchOrg: ERROR orgId=\(orgId) error=\(error.localizedDescription)")
+            throw error
         }
     }
 
