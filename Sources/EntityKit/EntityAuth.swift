@@ -53,6 +53,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     @Published public var baseURL: URL
 
     @Published public private(set) var accessToken: String?
+    { didSet { notifyTokenListeners(accessToken) } }
     @Published public private(set) var sessionId: String?
     @Published public private(set) var userId: String?
     @Published public private(set) var liveUsername: String?
@@ -82,6 +83,26 @@ public final class EntityAuth: NSObject, ObservableObject {
         let initial = UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com"
         self.baseURL = URL(string: initial) ?? URL(string: "https://entity-auth.com")!
         super.init()
+    }
+
+    // MARK: Token change callbacks (web parity)
+    private var tokenListeners: [UUID: (String?) -> Void] = [:]
+
+    private func notifyTokenListeners(_ token: String?) {
+        for listener in tokenListeners.values { listener(token) }
+    }
+
+    /// Register a token change listener. Dispose the returned cancellable to unsubscribe.
+    @discardableResult
+    public func onTokenChange(_ listener: @escaping (String?) -> Void) -> AnyCancellable {
+        let id = UUID()
+        tokenListeners[id] = listener
+        return AnyCancellable { [weak self] in self?.tokenListeners.removeValue(forKey: id) }
+    }
+
+    /// Apply a new access token from an external auth flow (web parity)
+    public func applyAccessToken(_ token: String) {
+        self.accessToken = token
     }
 
     public func updateBaseURL(_ urlString: String) {
@@ -122,6 +143,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         self.userId = uid
         startUserWatcher()
         startOrganizationsWatcher()
+        startSessionWatcher()
         // Eagerly populate profile fields for immediate UI
         Task { await self.fetchCurrentUserProfile() }
     }
@@ -231,12 +253,18 @@ public final class EntityAuth: NSObject, ObservableObject {
     // fetchCurrentUser removed in favor of realtime Convex subscription
 
     public func checkUsernameAvailability(_ username: String) async throws -> Bool {
-        let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
+        let result = try await checkUsername(username)
+        return result.valid && result.available
+    }
+
+    /// Returns both validity and availability flags for a username (web parity)
+    public func checkUsername(_ value: String) async throws -> (valid: Bool, available: Bool) {
+        let encoded = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
         let data = try await get(path: "/api/user/username/check?value=\(encoded)", authorized: true)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
-        let isValid = (json["valid"] as? Bool) ?? false
-        let isAvailable = (json["available"] as? Bool) ?? false
-        return isValid && isAvailable
+        let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        let valid = (json["valid"] as? Bool) ?? false
+        let available = (json["available"] as? Bool) ?? false
+        return (valid, available)
     }
 
     // MARK: - Users
@@ -596,6 +624,19 @@ public final class EntityAuth: NSObject, ObservableObject {
         let decoded = try JSONDecoder().decode(GraphQLResponse<T>.self, from: data)
         if let d = decoded.data { return d }
         throw NSError(domain: "EntityAuth", code: 902, userInfo: [NSLocalizedDescriptionKey: "GraphQL error"])
+    }
+
+    // Expose Convex config (web parity)
+    public func getConvexConfig() async throws -> [String: Any] {
+        let data = try await get(path: "/api/convex", authorized: false)
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    /// Public auth-aware request helper with automatic refresh on 401 (web-like fetch)
+    public func fetch(_ path: String, method: String = "GET", headers: [String: String] = [:], body: Data? = nil, authorized: Bool = true) async throws -> Data {
+        let baseHeaders = authorized ? authHeader() : ["content-type": "application/json"]
+        let merged = baseHeaders.merging(headers, uniquingKeysWith: { a, _ in a })
+        return try await request(method: method, path: path, headers: merged, body: body)
     }
 }
 
