@@ -260,6 +260,35 @@ public final class EntityAuth: NSObject, ObservableObject {
         return try JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
+    // MARK: - Sessions
+    public func getCurrentSession() async throws -> [String: Any]? {
+        let data = try await get(path: "/api/session/current", authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    public func listSessions(includeRevoked: Bool = false) async throws -> [[String: Any]] {
+        let path = includeRevoked ? "/api/session/list?includeRevoked=true" : "/api/session/list"
+        let data = try await get(path: path, authorized: true)
+        return (try JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+    }
+
+    public func getSessionById(_ id: String) async throws -> [String: Any]? {
+        let data = try await get(path: "/api/session/by-id?id=\(id)", authorized: true)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    public func revokeSession(_ sessionId: String) async throws -> [String: Any] {
+        let body: [String: Any] = ["sessionId": sessionId]
+        let data = try await post(path: "/api/session/revoke", headers: [:], json: body, authorized: true)
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    public func revokeSessionsByUser(_ userId: String) async throws -> [String: Any] {
+        let body: [String: Any] = ["userId": userId]
+        let data = try await post(path: "/api/session/revoke-by-user", headers: [:], json: body, authorized: true)
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
     // Derive current session (tenantId) from API
     public func fetchCurrentTenantId() async -> String? {
         self.logs.append("fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil")")
