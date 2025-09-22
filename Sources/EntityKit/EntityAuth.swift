@@ -271,35 +271,68 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     // Derive current session (tenantId) from API
     public func fetchCurrentTenantId() async -> String? {
-        self.logs.append("fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil")")
+        self.logs.append("fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil"); tokenPresent=\(accessToken != nil)")
+        print("[EA-DEBUG] fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil"); tokenPresent=\(accessToken != nil)")
+
         // Throttle to avoid tight loops from view re-renders
         if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
             self.logs.append("fetchCurrentTenantId: throttle hit; returning cached=\(cachedTenantId ?? "nil")")
+            print("[EA-DEBUG] fetchCurrentTenantId: throttle hit; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         if tenantFetchInFlight {
             self.logs.append("fetchCurrentTenantId: in-flight; returning cached=\(cachedTenantId ?? "nil")")
+            print("[EA-DEBUG] fetchCurrentTenantId: in-flight; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         tenantFetchInFlight = true
         defer { tenantFetchInFlight = false; lastTenantFetchAt = Date() }
-        // Prefer decoding from access token to avoid HTTP dependency
-        if let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
+
+        // TEMP: Skip JWT decode to match web behavior - test if API returns correct tenant
+        if false, let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
             cachedTenantId = tid
             self.logs.append("fetchCurrentTenantId: decoded from JWT; tid=\(tid)")
+            print("[EA-DEBUG] fetchCurrentTenantId: decoded from JWT; tid=\(tid)")
+
+            // Debug: show full JWT payload
+            if let payload = Self.decodeJWTPayload(fromJWT: token) {
+                print("[EA-DEBUG] Full JWT payload: \(payload)")
+                self.logs.append("Full JWT payload: \(payload)")
+            }
+
             return tid
+        } else if let token = accessToken {
+            self.logs.append("fetchCurrentTenantId: JWT decode failed for token")
+            print("[EA-DEBUG] fetchCurrentTenantId: JWT decode failed for token=\(token.prefix(20))...")
+
+            // Debug: try to decode full payload even if tid extraction failed
+            if let payload = Self.decodeJWTPayload(fromJWT: token) {
+                print("[EA-DEBUG] JWT payload when tid extraction failed: \(payload)")
+                self.logs.append("JWT payload when tid extraction failed: \(payload)")
+            }
+        } else {
+            self.logs.append("fetchCurrentTenantId: no access token")
+            print("[EA-DEBUG] fetchCurrentTenantId: no access token")
         }
+
         // Fallback to server-side session: mirrors web SDK behavior
         do {
             if let me = try await getUserMe(), let tid = me["tenantId"] as? String, !tid.isEmpty {
                 cachedTenantId = tid
                 self.logs.append("fetchCurrentTenantId: /api/user/me; tid=\(tid)")
+                print("[EA-DEBUG] fetchCurrentTenantId: /api/user/me; tid=\(tid)")
                 return tid
+            } else {
+                self.logs.append("fetchCurrentTenantId: /api/user/me returned no valid tenantId")
+                print("[EA-DEBUG] fetchCurrentTenantId: /api/user/me returned no valid tenantId")
             }
         } catch {
-            // best-effort; ignore errors here
+            self.logs.append("fetchCurrentTenantId: /api/user/me error: \(error)")
+            print("[EA-DEBUG] fetchCurrentTenantId: /api/user/me error: \(error)")
         }
+
         self.logs.append("fetchCurrentTenantId: returning cached=\(cachedTenantId ?? "nil")")
+        print("[EA-DEBUG] fetchCurrentTenantId: returning cached=\(cachedTenantId ?? "nil")")
         return cachedTenantId
     }
 
@@ -466,7 +499,18 @@ public final class EntityAuth: NSObject, ObservableObject {
                         self.logs.append("startOrganizationsWatcher: update count=\(mapped.count)")
                         let ids = mapped.map { $0.id }.joined(separator: ",")
                         let slugs = mapped.map { $0.slug }.joined(separator: ",")
-                        self.logs.append("orgs: ids=[\(ids)] slugs=[\(slugs)] cachedTid=\(self.cachedTenantId ?? "nil")")
+                        let names = mapped.map { $0.name }.joined(separator: ",")
+                        self.logs.append("orgs: ids=[\(ids)] slugs=[\(slugs)] names=[\(names)] cachedTid=\(self.cachedTenantId ?? "nil")")
+
+                        // Debug: check if any org matches current tenant
+                        if let tid = self.cachedTenantId {
+                            let matchingOrgs = mapped.filter { $0.id == tid }
+                            print("[EA-DEBUG] Current tenant \(tid) matches \(matchingOrgs.count) orgs: \(matchingOrgs.map { $0.name })")
+                            self.logs.append("Current tenant \(tid) matches \(matchingOrgs.count) orgs")
+                        } else {
+                            print("[EA-DEBUG] No current tenant ID to match against")
+                            self.logs.append("No current tenant ID to match against")
+                        }
                     }
                 )
             print("[EA-DEBUG] startOrganizationsWatcher: Subscription set up successfully")
@@ -613,6 +657,15 @@ extension EntityAuth {
         if let tid = json["tid"] as? String { return tid }
         if let tidNum = json["tid"] as? NSNumber { return tidNum.stringValue }
         return nil
+    }
+
+    private static func decodeJWTPayload(fromJWT token: String) -> [String: Any]? {
+        let parts = token.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        let payloadB64 = String(parts[1])
+        guard let data = Data(base64URLEncoded: payloadB64),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return json
     }
 }
 
