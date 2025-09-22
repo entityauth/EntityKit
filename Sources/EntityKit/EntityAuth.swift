@@ -94,6 +94,10 @@ public final class EntityAuth: NSObject, ObservableObject {
         logs.removeAll()
     }
 
+    public func addLog(_ message: String) {
+        logs.append(message)
+    }
+
     // MARK: Public API
     public func register(email: String, password: String, tenantId: String) async throws {
         let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
@@ -201,11 +205,20 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     public func switchOrg(orgId: String) async throws {
         let body: [String: Any] = ["orgId": orgId]
+        print("[EA-DEBUG] switchOrg: request orgId=\(orgId)")
+        self.logs.append("switchOrg: request orgId=\(orgId)")
         _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
         // After switching org, refresh to obtain a new access token with updated tenant (tid)
         // and clear cached tenant so subsequent reads reflect the new org immediately
         self.cachedTenantId = nil
         try await refresh()
+        if let token = self.accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
+            print("[EA-DEBUG] switchOrg: refreshed token tid=\(tid)")
+            self.logs.append("switchOrg: refreshed token tid=\(tid)")
+        } else {
+            print("[EA-DEBUG] switchOrg: refreshed token but no tid decoded")
+            self.logs.append("switchOrg: refreshed token but no tid decoded")
+        }
     }
 
     public func getUserOrganizations() async throws -> [String: Any] {
@@ -258,11 +271,14 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     // Derive current session (tenantId) from API
     public func fetchCurrentTenantId() async -> String? {
+        self.logs.append("fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil")")
         // Throttle to avoid tight loops from view re-renders
         if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
+            self.logs.append("fetchCurrentTenantId: throttle hit; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         if tenantFetchInFlight {
+            self.logs.append("fetchCurrentTenantId: in-flight; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         tenantFetchInFlight = true
@@ -270,17 +286,20 @@ public final class EntityAuth: NSObject, ObservableObject {
         // Prefer decoding from access token to avoid HTTP dependency
         if let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
             cachedTenantId = tid
+            self.logs.append("fetchCurrentTenantId: decoded from JWT; tid=\(tid)")
             return tid
         }
         // Fallback to server-side session: mirrors web SDK behavior
         do {
             if let me = try await getUserMe(), let tid = me["tenantId"] as? String, !tid.isEmpty {
                 cachedTenantId = tid
+                self.logs.append("fetchCurrentTenantId: /api/user/me; tid=\(tid)")
                 return tid
             }
         } catch {
             // best-effort; ignore errors here
         }
+        self.logs.append("fetchCurrentTenantId: returning cached=\(cachedTenantId ?? "nil")")
         return cachedTenantId
     }
 
@@ -445,6 +464,9 @@ public final class EntityAuth: NSObject, ObservableObject {
                         self.liveOrganizations = mapped
                         print("[EA-DEBUG] startOrganizationsWatcher: liveOrganizations count=\(mapped.count)")
                         self.logs.append("startOrganizationsWatcher: update count=\(mapped.count)")
+                        let ids = mapped.map { $0.id }.joined(separator: ",")
+                        let slugs = mapped.map { $0.slug }.joined(separator: ",")
+                        self.logs.append("orgs: ids=[\(ids)] slugs=[\(slugs)] cachedTid=\(self.cachedTenantId ?? "nil")")
                     }
                 )
             print("[EA-DEBUG] startOrganizationsWatcher: Subscription set up successfully")
