@@ -205,33 +205,11 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     public func switchOrg(orgId: String) async throws {
         let body: [String: Any] = ["orgId": orgId]
-        print("[EA-DEBUG] switchOrg: START request orgId=\(orgId)")
-        self.logs.append("switchOrg: START request orgId=\(orgId)")
-
-        do {
-            let data = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
-            print("[EA-DEBUG] switchOrg: POST success for orgId=\(orgId), response size=\(data.count)")
-            self.logs.append("switchOrg: POST success for orgId=\(orgId)")
-
-            // After switching org, refresh to obtain a new access token with updated tenant (tid)
-            // and clear cached tenant so subsequent reads reflect the new org immediately
-            self.cachedTenantId = nil
-            print("[EA-DEBUG] switchOrg: calling refresh for orgId=\(orgId)")
-            try await refresh()
-            print("[EA-DEBUG] switchOrg: refresh completed for orgId=\(orgId)")
-
-            if let token = self.accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
-                print("[EA-DEBUG] switchOrg: SUCCESS orgId=\(orgId) -> tid=\(tid)")
-                self.logs.append("switchOrg: SUCCESS orgId=\(orgId) -> tid=\(tid)")
-            } else {
-                print("[EA-DEBUG] switchOrg: WARNING orgId=\(orgId) refresh succeeded but no tid decoded")
-                self.logs.append("switchOrg: WARNING orgId=\(orgId) no tid decoded")
-            }
-        } catch {
-            print("[EA-DEBUG] switchOrg: ERROR orgId=\(orgId) error=\(error)")
-            self.logs.append("switchOrg: ERROR orgId=\(orgId) error=\(error.localizedDescription)")
-            throw error
-        }
+        _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
+        // After switching org, refresh to obtain a new access token with updated tenant (tid)
+        // and clear cached tenant so subsequent reads reflect the new org immediately
+        self.cachedTenantId = nil
+        try await refresh()
     }
 
     public func getUserOrganizations() async throws -> [String: Any] {
@@ -284,18 +262,14 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     // Derive current session (tenantId) from API
     public func fetchCurrentTenantId() async -> String? {
-        self.logs.append("fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil"); tokenPresent=\(accessToken != nil)")
-        print("[EA-DEBUG] fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil"); tokenPresent=\(accessToken != nil)")
-
+        self.logs.append("fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil")")
         // Throttle to avoid tight loops from view re-renders
         if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
             self.logs.append("fetchCurrentTenantId: throttle hit; returning cached=\(cachedTenantId ?? "nil")")
-            print("[EA-DEBUG] fetchCurrentTenantId: throttle hit; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         if tenantFetchInFlight {
             self.logs.append("fetchCurrentTenantId: in-flight; returning cached=\(cachedTenantId ?? "nil")")
-            print("[EA-DEBUG] fetchCurrentTenantId: in-flight; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         tenantFetchInFlight = true
@@ -305,27 +279,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         if false, let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
             cachedTenantId = tid
             self.logs.append("fetchCurrentTenantId: decoded from JWT; tid=\(tid)")
-            print("[EA-DEBUG] fetchCurrentTenantId: decoded from JWT; tid=\(tid)")
-
-            // Debug: show full JWT payload
-            if let payload = Self.decodeJWTPayload(fromJWT: token) {
-                print("[EA-DEBUG] Full JWT payload: \(payload)")
-                self.logs.append("Full JWT payload: \(payload)")
-            }
-
             return tid
-        } else if let token = accessToken {
-            self.logs.append("fetchCurrentTenantId: JWT decode failed for token")
-            print("[EA-DEBUG] fetchCurrentTenantId: JWT decode failed for token=\(token.prefix(20))...")
-
-            // Debug: try to decode full payload even if tid extraction failed
-            if let payload = Self.decodeJWTPayload(fromJWT: token) {
-                print("[EA-DEBUG] JWT payload when tid extraction failed: \(payload)")
-                self.logs.append("JWT payload when tid extraction failed: \(payload)")
-            }
-        } else {
-            self.logs.append("fetchCurrentTenantId: no access token")
-            print("[EA-DEBUG] fetchCurrentTenantId: no access token")
         }
 
         // Fallback to server-side session: mirrors web SDK behavior
@@ -333,19 +287,12 @@ public final class EntityAuth: NSObject, ObservableObject {
             if let me = try await getUserMe(), let tid = me["tenantId"] as? String, !tid.isEmpty {
                 cachedTenantId = tid
                 self.logs.append("fetchCurrentTenantId: /api/user/me; tid=\(tid)")
-                print("[EA-DEBUG] fetchCurrentTenantId: /api/user/me; tid=\(tid)")
                 return tid
-            } else {
-                self.logs.append("fetchCurrentTenantId: /api/user/me returned no valid tenantId")
-                print("[EA-DEBUG] fetchCurrentTenantId: /api/user/me returned no valid tenantId")
             }
         } catch {
-            self.logs.append("fetchCurrentTenantId: /api/user/me error: \(error)")
-            print("[EA-DEBUG] fetchCurrentTenantId: /api/user/me error: \(error)")
+            // best-effort; ignore errors here
         }
-
         self.logs.append("fetchCurrentTenantId: returning cached=\(cachedTenantId ?? "nil")")
-        print("[EA-DEBUG] fetchCurrentTenantId: returning cached=\(cachedTenantId ?? "nil")")
         return cachedTenantId
     }
 
