@@ -118,10 +118,8 @@ public final class EntityAuth: NSObject, ObservableObject {
 
         keychainSet("ea_refresh", refresh)
         self.accessToken = access
-        print("[EA-DEBUG] login: access token set? \(self.accessToken != nil)")
         self.sessionId = sid
         self.userId = uid
-        print("[EA-DEBUG] login: starting watchers with token? \(self.accessToken != nil)")
         startUserWatcher()
         startOrganizationsWatcher()
         // Eagerly populate profile fields for immediate UI
@@ -142,7 +140,6 @@ public final class EntityAuth: NSObject, ObservableObject {
             keychainSet("ea_refresh", newRefresh)
         }
         self.accessToken = access
-        print("[EA-DEBUG] refresh: new access token set")
     }
 
     public func logout() async {
@@ -291,14 +288,11 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     // Derive current session (tenantId) from API
     public func fetchCurrentTenantId() async -> String? {
-        self.logs.append("fetchCurrentTenantId: begin; cached=\(cachedTenantId ?? "nil")")
         // Throttle to avoid tight loops from view re-renders
         if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
-            self.logs.append("fetchCurrentTenantId: throttle hit; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         if tenantFetchInFlight {
-            self.logs.append("fetchCurrentTenantId: in-flight; returning cached=\(cachedTenantId ?? "nil")")
             return cachedTenantId
         }
         tenantFetchInFlight = true
@@ -307,7 +301,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         // Skip JWT decode to match web behavior - use API call for reliable tenant ID
         if false, let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
             cachedTenantId = tid
-            self.logs.append("fetchCurrentTenantId: decoded from JWT; tid=\(tid)")
             return tid
         }
 
@@ -315,13 +308,11 @@ public final class EntityAuth: NSObject, ObservableObject {
         do {
             if let me = try await getUserMe(), let tid = me["tenantId"] as? String, !tid.isEmpty {
                 cachedTenantId = tid
-                self.logs.append("fetchCurrentTenantId: /api/user/me; tid=\(tid)")
                 return tid
             }
         } catch {
             // best-effort; ignore errors here
         }
-        self.logs.append("fetchCurrentTenantId: returning cached=\(cachedTenantId ?? "nil")")
         return cachedTenantId
     }
 
@@ -343,7 +334,6 @@ public final class EntityAuth: NSObject, ObservableObject {
         sessionSubscription?.cancel()
         guard let sid = sessionId else { return }
         guard self.accessToken != nil else {
-            print("[EA-DEBUG] startSessionWatcher: aborted, token missing")
             return
         }
         Task { [weak self] in
@@ -372,24 +362,18 @@ public final class EntityAuth: NSObject, ObservableObject {
     private func startUserWatcher() {
         userSubscription?.cancel()
         guard let uid = userId else {
-            print("[EA-DEBUG] startUserWatcher: No userId")
             return
         }
         guard self.accessToken != nil else {
-            print("[EA-DEBUG] startUserWatcher: aborted, token missing")
             return
         }
-        print("[EA-DEBUG] startUserWatcher: Starting for uid=\(uid), tokenPresent=\(self.accessToken != nil)")
         Task { [weak self] in
             guard let self else {
-                print("[EA-DEBUG] startUserWatcher: Self deallocated")
                 return
             }
             guard let client = await ensureConvexClient() else {
-                print("[EA-DEBUG] startUserWatcher: Failed to get Convex client, tokenPresent=\(self.accessToken != nil)")
                 return
             }
-            print("[EA-DEBUG] startUserWatcher: Got Convex client, setting up subscription, tokenPresent=\(self.accessToken != nil)")
             struct UserDoc: Decodable { struct Props: Decodable { let username: String? }; let properties: Props? }
             let updates: AnyPublisher<UserDoc?, ClientError> = client.subscribe(
                 to: "auth/users.js:getById",
@@ -402,55 +386,35 @@ public final class EntityAuth: NSObject, ObservableObject {
                 .receive(on: DispatchQueue.main)
                 .sink(
                     receiveCompletion: { completion in
-                        print("[EA-DEBUG] startUserWatcher: Subscription completed: \(completion)")
                     },
                     receiveValue: { [weak self] value in
                         let username = value?.properties?.username
-                        print("[EA-DEBUG] startUserWatcher: Received update - username=\(username ?? "nil"), full value: \(String(describing: value))")
                         DispatchQueue.main.async {
                             self?.liveUsername = username
-                            print("[EA-DEBUG] startUserWatcher: Updated liveUsername to: \(username ?? "nil")")
                         }
                     }
                 )
-            print("[EA-DEBUG] startUserWatcher: Subscription set up successfully")
 
             // Add a periodic check to see if we're getting initial data
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                print("[EA-DEBUG] startUserWatcher: 2s check - current liveUsername: \(self?.liveUsername ?? "nil")")
-            }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-                print("[EA-DEBUG] startUserWatcher: 5s check - current liveUsername: \(self?.liveUsername ?? "nil")")
-            }
         }
     }
 
     private func startOrganizationsWatcher() {
         orgsSubscription?.cancel()
         guard let uid = userId else {
-            print("[EA-DEBUG] startOrganizationsWatcher: No userId")
-            self.logs.append("startOrganizationsWatcher: No userId")
             return
         }
         guard self.accessToken != nil else {
-            print("[EA-DEBUG] startOrganizationsWatcher: aborted, token missing")
-            self.logs.append("startOrganizationsWatcher: aborted, token missing")
             return
         }
-        print("[EA-DEBUG] startOrganizationsWatcher: Starting for uid=\(uid), tokenPresent=\(self.accessToken != nil)")
-        self.logs.append("startOrganizationsWatcher: starting for uid=\(uid)")
         Task { [weak self] in
             guard let self else {
-                print("[EA-DEBUG] startOrganizationsWatcher: Self deallocated")
                 return
             }
             guard let client = await ensureConvexClient() else {
-                print("[EA-DEBUG] startOrganizationsWatcher: Failed to get Convex client, tokenPresent=\(self.accessToken != nil)")
-                self.logs.append("startOrganizationsWatcher: Failed to get Convex client")
                 return
             }
-            self.logs.append("startOrganizationsWatcher: Subscribing to memberships.js:getOrganizationsForUser")
             struct OrgItem: Decodable {
                 struct OrgDoc: Decodable { struct Props: Decodable { let name: String?; let slug: String?; let memberCount: Int? }; let _id: String?; let properties: Props?; let createdAt: Double? }
                 let organization: OrgDoc?
@@ -468,8 +432,6 @@ public final class EntityAuth: NSObject, ObservableObject {
                 .receive(on: DispatchQueue.main)
                 .sink(
                     receiveCompletion: { completion in
-                        print("[EA-DEBUG] startOrganizationsWatcher: Subscription completed: \(completion)")
-                        self.logs.append("startOrganizationsWatcher: completion=\(completion)")
                     },
                     receiveValue: { [weak self] value in
                         guard let self else { return }
@@ -484,26 +446,17 @@ public final class EntityAuth: NSObject, ObservableObject {
                             return LiveOrganization(id: id, name: name, slug: slug, role: role, memberCount: memberCount, joinedAtMs: joinedAtMs, createdAtMs: createdAtMs)
                         }
                         self.liveOrganizations = mapped
-                        print("[EA-DEBUG] startOrganizationsWatcher: liveOrganizations count=\(mapped.count)")
-                        self.logs.append("startOrganizationsWatcher: update count=\(mapped.count)")
                         let ids = mapped.map { $0.id }.joined(separator: ",")
                         let slugs = mapped.map { $0.slug }.joined(separator: ",")
                         let names = mapped.map { $0.name }.joined(separator: ",")
-                        self.logs.append("orgs: ids=[\(ids)] slugs=[\(slugs)] names=[\(names)] cachedTid=\(self.cachedTenantId ?? "nil")")
 
                         // Debug: check if any org matches current tenant
                         if let tid = self.cachedTenantId {
                             let matchingOrgs = mapped.filter { $0.id == tid }
-                            print("[EA-DEBUG] Current tenant \(tid) matches \(matchingOrgs.count) orgs: \(matchingOrgs.map { $0.name })")
-                            self.logs.append("Current tenant \(tid) matches \(matchingOrgs.count) orgs")
                         } else {
-                            print("[EA-DEBUG] No current tenant ID to match against")
-                            self.logs.append("No current tenant ID to match against")
                         }
                     }
                 )
-            print("[EA-DEBUG] startOrganizationsWatcher: Subscription set up successfully")
-            self.logs.append("startOrganizationsWatcher: subscription set up")
         }
     }
 
@@ -511,34 +464,27 @@ public final class EntityAuth: NSObject, ObservableObject {
 
     private func ensureConvexClient() async -> ConvexClient? {
         if let existing = convexClient {
-            print("[EA-DEBUG] ensureConvexClient: Using existing client tag=\(convexClientTag ?? "nil"), tokenPresent=\(self.accessToken != nil)")
             return existing
         }
         if let task = clientCreationTask {
-            print("[EA-DEBUG] ensureConvexClient: Awaiting in-flight creation task, tokenPresent=\(self.accessToken != nil)")
             return await task.value
         }
         let task = Task { [weak self] () -> ConvexClient? in
             guard let self else { return nil }
-            print("[EA-DEBUG] ensureConvexClient: Creating new client, tokenPresent=\(self.accessToken != nil)")
             do {
                 let data = try await self.get(path: "/api/convex", authorized: false)
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let url = json["convexUrl"] as? String {
-                    print("[EA-DEBUG] ensureConvexClient: Got convex URL: \(url)")
                     let client = ConvexClient(deploymentUrl: url)
                     await MainActor.run {
                         self.convexClient = client
                         self.convexClientTag = UUID().uuidString.prefix(8).description
-                        print("[EA-DEBUG] ensureConvexClient: Client created successfully tag=\(self.convexClientTag ?? "nil")")
                     }
                     return client
                 } else {
-                    print("[EA-DEBUG] ensureConvexClient: Failed to parse convex URL from response")
                     return nil
                 }
             } catch {
-                print("[EA-DEBUG] ensureConvexClient: Error getting convex config: \(error)")
                 return nil
             }
         }

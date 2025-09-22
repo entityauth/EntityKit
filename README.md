@@ -23,7 +23,7 @@ import EntityKit
 func signIn() async {
     do {
         try await EntityAuth.shared.login(email: "alice@example.com", password: "P@ssw0rd!", tenantId: "t1")
-        // Use EntityAuth.shared API for authorized calls
+        _ = try await EntityAuth.shared.getUserMe()
     } catch {
         print("Login failed: \(error)")
     }
@@ -32,11 +32,16 @@ func signIn() async {
 
  
 
-### Username APIs
+### Users & Username
 ```swift
 try await EntityAuth.shared.setUsername("alice")
-let (id, username) = try await EntityAuth.shared.fetchCurrentUser()
 let ok = try await EntityAuth.shared.checkUsernameAvailability("alice")
+```
+
+### Sessions
+```swift
+_ = try await EntityAuth.shared.getCurrentSession()
+let sessions = try await EntityAuth.shared.listSessions()
 ```
 
 ### Configuration
