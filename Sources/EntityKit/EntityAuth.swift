@@ -211,6 +211,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         // After switching org, refresh to obtain a new access token with updated tenant (tid)
         // and clear cached tenant so subsequent reads reflect the new org immediately
         self.cachedTenantId = nil
+        self.lastTenantFetchAt = nil // Clear throttle to allow immediate fresh fetch
         try await refresh()
         if let token = self.accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
             print("[EA-DEBUG] switchOrg: refreshed token tid=\(tid)")
@@ -288,7 +289,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         tenantFetchInFlight = true
         defer { tenantFetchInFlight = false; lastTenantFetchAt = Date() }
 
-        // TEMP: Skip JWT decode to match web behavior - test if API returns correct tenant
+        // Skip JWT decode to match web behavior - use API call for reliable tenant ID
         if false, let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
             cachedTenantId = tid
             self.logs.append("fetchCurrentTenantId: decoded from JWT; tid=\(tid)")
