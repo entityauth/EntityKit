@@ -579,6 +579,24 @@ public final class EntityAuth: NSObject, ObservableObject {
         } catch {
         }
     }
+
+    // MARK: - GraphQL & OpenAPI helpers
+    public func openAPI() async throws -> [String: Any] {
+        let data = try await get(path: "/api/openapi", authorized: false)
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    public func graphql<T: Decodable>(query: String, variables: [String: Any]? = nil) async throws -> T {
+        let body: [String: Any] = [
+            "query": query,
+            "variables": variables ?? [:]
+        ]
+        let data = try await post(path: "/api/graphql", headers: [:], json: body, authorized: true)
+        struct GraphQLResponse<U: Decodable>: Decodable { let data: U? }
+        let decoded = try JSONDecoder().decode(GraphQLResponse<T>.self, from: data)
+        if let d = decoded.data { return d }
+        throw NSError(domain: "EntityAuth", code: 902, userInfo: [NSLocalizedDescriptionKey: "GraphQL error"])
+    }
 }
 
 // MARK: - Device helpers
