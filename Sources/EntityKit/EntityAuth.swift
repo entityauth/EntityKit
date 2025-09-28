@@ -120,13 +120,13 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: Public API
-    public func register(email: String, password: String, tenantId: String) async throws {
-        let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
+    public func register(email: String, password: String, workspaceTenantId: String) async throws {
+        let body: [String: Any] = ["email": email, "password": password, "workspaceTenantId": workspaceTenantId]
         _ = try await post(path: "/api/auth/register", headers: ["x-client": "native"], json: body, authorized: false)
     }
 
-    public func login(email: String, password: String, tenantId: String) async throws {
-        let body: [String: Any] = ["email": email, "password": password, "tenantId": tenantId]
+    public func login(email: String, password: String, workspaceTenantId: String) async throws {
+        let body: [String: Any] = ["email": email, "password": password, "workspaceTenantId": workspaceTenantId]
         let headers: [String: String] = ["x-client": "native"]
         let data = try await post(path: "/api/auth/login", headers: headers, json: body, authorized: false)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -203,9 +203,9 @@ public final class EntityAuth: NSObject, ObservableObject {
         public let joinedAtMs: Double
         public let createdAtMs: Double
     }
-    public func createOrg(tenantId: String, name: String, slug: String, ownerId: String) async throws {
+    public func createOrg(workspaceTenantId: String, name: String, slug: String, ownerId: String) async throws {
         let body: [String: Any] = [
-            "tenantId": tenantId,
+            "workspaceTenantId": workspaceTenantId,
             "name": name,
             "slug": slug,
             "ownerId": ownerId,
@@ -314,7 +314,7 @@ public final class EntityAuth: NSObject, ObservableObject {
         return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
-    // Derive current session (tenantId) from API
+    // Derive current session (workspaceTenantId) from API
     public func fetchCurrentTenantId() async -> String? {
         // Throttle to avoid tight loops from view re-renders
         if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
@@ -334,7 +334,7 @@ public final class EntityAuth: NSObject, ObservableObject {
 
         // Fallback to server-side session: mirrors web SDK behavior
         do {
-            if let me = try await getUserMe(), let tid = me["tenantId"] as? String, !tid.isEmpty {
+            if let me = try await getUserMe(), let tid = me["workspaceTenantId"] as? String, !tid.isEmpty {
                 cachedTenantId = tid
                 return tid
             }

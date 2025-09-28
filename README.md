@@ -22,7 +22,7 @@ import EntityKit
 @MainActor
 func signIn() async {
     do {
-        try await EntityAuth.shared.login(email: "alice@example.com", password: "P@ssw0rd!", tenantId: "t1")
+        try await EntityAuth.shared.login(email: "alice@example.com", password: "P@ssw0rd!", workspaceTenantId: "t1")
         _ = try await EntityAuth.shared.getUserMe()
     } catch {
         print("Login failed: \(error)")
