@@ -3,12 +3,39 @@ import Security
 import SwiftUI
 import Combine
 import ConvexMobile
- 
+import os.log
+
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
 import AppKit
 #endif
+
+// MARK: - Organization models
+public struct OrganizationSummary: Identifiable, Hashable, Codable {
+    public let orgId: String
+    public let name: String?
+    public let slug: String?
+    public let memberCount: Int?
+    public let role: String
+    public let joinedAt: Double
+    public let workspaceTenantId: String?
+
+    public var id: String { orgId }
+}
+
+public struct ActiveOrganization: Identifiable, Hashable, Codable {
+    public let orgId: String
+    public let name: String?
+    public let slug: String?
+    public let memberCount: Int?
+    public let role: String
+    public let joinedAt: Double
+    public let workspaceTenantId: String?
+    public let description: String?
+
+    public var id: String { orgId }
+}
 
 // MARK: - Keychain helpers
 private func keychainSet(_ key: String, _ value: String) {
@@ -57,11 +84,12 @@ public final class EntityAuth: NSObject, ObservableObject {
     @Published public private(set) var sessionId: String?
     @Published public private(set) var userId: String?
     @Published public private(set) var liveUsername: String?
-    @Published public private(set) var liveOrganizations: [LiveOrganization]? = nil
-    public var liveOrganizationsPublisher: AnyPublisher<[LiveOrganization]?, Never> { $liveOrganizations.eraseToAnyPublisher() }
+    @Published public private(set) var liveOrganizations: [OrganizationSummary]? = nil
+    public var liveOrganizationsPublisher: AnyPublisher<[OrganizationSummary]?, Never> { $liveOrganizations.eraseToAnyPublisher() }
+    @Published public private(set) var activeOrganization: ActiveOrganization?
     @Published public private(set) var logs: [String] = []
     
-    @Published private(set) var cachedTenantId: String?
+    @Published private(set) var cachedWorkspaceTenantId: String?
     
 
     var onLogout: (() -> Void)?
@@ -75,9 +103,7 @@ public final class EntityAuth: NSObject, ObservableObject {
     private var clientCreationTask: Task<ConvexClient?, Never>?
     private var lastTenantFetchAt: Date?
     private var tenantFetchInFlight = false
-    
-
-    
+    private let orgLogger = Logger(subsystem: "com.entitykit", category: "organizations")
 
     private override init() {
         let initial = UserDefaults.standard.string(forKey: baseURLDefaultsKey) ?? "https://entity-auth.com"
@@ -146,6 +172,20 @@ public final class EntityAuth: NSObject, ObservableObject {
         startSessionWatcher()
         // Eagerly populate profile fields for immediate UI
         Task { await self.fetchCurrentUserProfile() }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let organization = try await self.getActiveOrganization()
+                await MainActor.run {
+                    self.activeOrganization = organization
+                    if let workspaceTenantId = organization?.workspaceTenantId, !workspaceTenantId.isEmpty {
+                        self.cachedWorkspaceTenantId = workspaceTenantId
+                    }
+                }
+            } catch {
+                self.orgLogger.error("Failed to fetch active organization after login: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     public func refresh() async throws {
@@ -178,6 +218,9 @@ public final class EntityAuth: NSObject, ObservableObject {
         self.sessionId = nil
         self.userId = nil
         self.liveUsername = nil
+        self.liveOrganizations = nil
+        self.activeOrganization = nil
+        self.cachedWorkspaceTenantId = nil
         
         sessionSubscription?.cancel()
         sessionSubscription = nil
@@ -194,15 +237,6 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: - Organizations
-    public struct LiveOrganization: Identifiable, Hashable, Codable {
-        public let id: String
-        public let name: String
-        public let slug: String
-        public let role: String
-        public let memberCount: Int?
-        public let joinedAtMs: Double
-        public let createdAtMs: Double
-    }
     public func createOrg(workspaceTenantId: String, name: String, slug: String, ownerId: String) async throws {
         let body: [String: Any] = [
             "workspaceTenantId": workspaceTenantId,
@@ -225,15 +259,25 @@ public final class EntityAuth: NSObject, ObservableObject {
     public func switchOrg(orgId: String) async throws {
         let body: [String: Any] = ["orgId": orgId]
         _ = try await post(path: "/api/org/switch", headers: [:], json: body, authorized: true)
-        // After switching org, refresh to obtain a new access token with updated tenant (tid)
-        // and clear cached tenant so subsequent reads reflect the new org immediately
-        self.cachedTenantId = nil
+        self.cachedWorkspaceTenantId = nil
         try await refresh()
+        let organization = try await getActiveOrganization()
+        self.activeOrganization = organization
+        if let organization, let workspaceTenantId = organization.workspaceTenantId, !workspaceTenantId.isEmpty {
+            self.cachedWorkspaceTenantId = workspaceTenantId
+        }
     }
 
-    public func getUserOrganizations() async throws -> [String: Any] {
+    public func getUserOrganizations() async throws -> [OrganizationSummary] {
         let data = try await get(path: "/api/org/list", authorized: true)
-        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        struct Response: Decodable { let organizations: [OrganizationSummary] }
+        return try JSONDecoder().decode(Response.self, from: data).organizations
+    }
+
+    public func getActiveOrganization() async throws -> ActiveOrganization? {
+        let data = try await get(path: "/api/org/active", authorized: true)
+        struct Response: Decodable { let organization: ActiveOrganization? }
+        return try JSONDecoder().decode(Response.self, from: data).organization
     }
 
 
@@ -314,34 +358,31 @@ public final class EntityAuth: NSObject, ObservableObject {
         return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
-    // Derive current session (workspaceTenantId) from API
-    public func fetchCurrentTenantId() async -> String? {
-        // Throttle to avoid tight loops from view re-renders
-        if let last = lastTenantFetchAt, Date().timeIntervalSince(last) < 5.0 {
-            return cachedTenantId
-        }
-        if tenantFetchInFlight {
-            return cachedTenantId
-        }
-        tenantFetchInFlight = true
-        defer { tenantFetchInFlight = false; lastTenantFetchAt = Date() }
-
-        // Skip JWT decode to match web behavior - use API call for reliable tenant ID
-        if false, let token = accessToken, let tid = Self.decodeTenantId(fromJWT: token) {
-            cachedTenantId = tid
-            return tid
+    // Derive current session workspace tenant id from API
+    public func fetchCurrentWorkspaceTenantId() async -> String? {
+        if let cachedWorkspaceTenantId, !cachedWorkspaceTenantId.isEmpty {
+            return cachedWorkspaceTenantId
         }
 
-        // Fallback to server-side session: mirrors web SDK behavior
         do {
-            if let me = try await getUserMe(), let tid = me["workspaceTenantId"] as? String, !tid.isEmpty {
-                cachedTenantId = tid
-                return tid
+            if let activeOrg = try await getActiveOrganization(), let workspaceTenantId = activeOrg?.workspaceTenantId, !workspaceTenantId.isEmpty {
+                self.activeOrganization = activeOrg
+                self.cachedWorkspaceTenantId = workspaceTenantId
+                return workspaceTenantId
             }
         } catch {
-            // best-effort; ignore errors here
+            orgLogger.error("Failed to fetch active organization: \(error.localizedDescription, privacy: .public)")
         }
-        return cachedTenantId
+
+        do {
+            if let me = try await getUserMe(), let workspaceTenantId = me["workspaceTenantId"] as? String, !workspaceTenantId.isEmpty {
+                cachedWorkspaceTenantId = workspaceTenantId
+                return workspaceTenantId
+            }
+        } catch {
+            orgLogger.error("Failed to fetch workspace tenant id: \(error.localizedDescription, privacy: .public)")
+        }
+        return cachedWorkspaceTenantId
     }
 
     
@@ -444,7 +485,17 @@ public final class EntityAuth: NSObject, ObservableObject {
                 return
             }
             struct OrgItem: Decodable {
-                struct OrgDoc: Decodable { struct Props: Decodable { let name: String?; let slug: String?; let memberCount: Int? }; let _id: String?; let properties: Props?; let createdAt: Double? }
+                struct OrgDoc: Decodable {
+                    struct Props: Decodable {
+                        let name: String?
+                        let slug: String?
+                        let memberCount: Int?
+                        let description: String?
+                    }
+                    let _id: String?
+                    let properties: Props?
+                    let workspaceTenantId: String?
+                }
                 let organization: OrgDoc?
                 let role: String?
                 let joinedAt: Double?
@@ -463,25 +514,54 @@ public final class EntityAuth: NSObject, ObservableObject {
                     },
                     receiveValue: { [weak self] value in
                         guard let self else { return }
-                        let mapped: [LiveOrganization] = (value ?? []).compactMap { item in
-                            guard let doc = item.organization, let id = doc._id else { return nil }
-                            let name = doc.properties?.name ?? ""
-                            let slug = doc.properties?.slug ?? ""
+                        let summaries: [OrganizationSummary] = (value ?? []).compactMap { item in
+                            guard let doc = item.organization, let id = doc._id else {
+                                orgLogger.error("Organization missing identifier")
+                                return nil
+                            }
+                            let props = doc.properties ?? OrgItem.OrgDoc.Props(name: nil, slug: nil, memberCount: nil, description: nil)
                             let role = item.role ?? "member"
-                            let memberCount = doc.properties?.memberCount
-                            let joinedAtMs = item.joinedAt ?? 0
-                            let createdAtMs = doc.createdAt ?? 0
-                            return LiveOrganization(id: id, name: name, slug: slug, role: role, memberCount: memberCount, joinedAtMs: joinedAtMs, createdAtMs: createdAtMs)
+                            let joinedAt = item.joinedAt ?? 0
+                            return OrganizationSummary(
+                                orgId: id,
+                                name: props.name,
+                                slug: props.slug,
+                                memberCount: props.memberCount,
+                                role: role,
+                                joinedAt: joinedAt,
+                                workspaceTenantId: doc.workspaceTenantId
+                            )
                         }
-                        self.liveOrganizations = mapped
-                        let ids = mapped.map { $0.id }.joined(separator: ",")
-                        let slugs = mapped.map { $0.slug }.joined(separator: ",")
-                        let names = mapped.map { $0.name }.joined(separator: ",")
-
-                        // Debug: check if any org matches current tenant
-                        if let tid = self.cachedTenantId {
-                            let matchingOrgs = mapped.filter { $0.id == tid }
-                        } else {
+                        self.liveOrganizations = summaries
+                        let activeOrg =
+                            (value ?? [])
+                            .compactMap { item -> ActiveOrganization? in
+                                guard
+                                    let doc = item.organization,
+                                    let id = doc._id
+                                else {
+                                    orgLogger.error("Active organization missing identifier")
+                                    return nil
+                                }
+                                let props = doc.properties ?? OrgItem.OrgDoc.Props(name: nil, slug: nil, memberCount: nil, description: nil)
+                                return ActiveOrganization(
+                                    orgId: id,
+                                    name: props.name,
+                                    slug: props.slug,
+                                    memberCount: props.memberCount,
+                                    role: item.role ?? "member",
+                                    joinedAt: item.joinedAt ?? 0,
+                                    workspaceTenantId: doc.workspaceTenantId,
+                                    description: props.description
+                                )
+                            }
+                            .first { activeOrganization in
+                                guard let cachedWorkspaceTenantId = self.cachedWorkspaceTenantId else { return true }
+                                return activeOrganization.workspaceTenantId == cachedWorkspaceTenantId
+                            }
+                        self.activeOrganization = activeOrg
+                        if let activeOrg, let workspaceTenantId = activeOrg.workspaceTenantId, !workspaceTenantId.isEmpty {
+                            self.cachedWorkspaceTenantId = workspaceTenantId
                         }
                     }
                 )
@@ -609,9 +689,8 @@ public final class EntityAuth: NSObject, ObservableObject {
     }
 
     // MARK: - GraphQL & OpenAPI helpers
-    public func openAPI() async throws -> [String: Any] {
-        let data = try await get(path: "/api/openapi", authorized: false)
-        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    private struct GraphQLResponse<T: Decodable>: Decodable {
+        let data: T?
     }
 
     public func graphql<T: Decodable>(query: String, variables: [String: Any]? = nil) async throws -> T {
@@ -620,7 +699,6 @@ public final class EntityAuth: NSObject, ObservableObject {
             "variables": variables ?? [:]
         ]
         let data = try await post(path: "/api/graphql", headers: [:], json: body, authorized: true)
-        struct GraphQLResponse<U: Decodable>: Decodable { let data: U? }
         let decoded = try JSONDecoder().decode(GraphQLResponse<T>.self, from: data)
         if let d = decoded.data { return d }
         throw NSError(domain: "EntityAuth", code: 902, userInfo: [NSLocalizedDescriptionKey: "GraphQL error"])
