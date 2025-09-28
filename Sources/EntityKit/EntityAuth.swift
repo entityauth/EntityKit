@@ -516,7 +516,7 @@ public final class EntityAuth: NSObject, ObservableObject {
                         guard let self else { return }
                         let summaries: [OrganizationSummary] = (value ?? []).compactMap { item in
                             guard let doc = item.organization, let id = doc._id else {
-                                orgLogger.error("Organization missing identifier")
+                                self.orgLogger.error("Organization missing identifier")
                                 return nil
                             }
                             let props = doc.properties ?? OrgItem.OrgDoc.Props(name: nil, slug: nil, memberCount: nil, description: nil)
@@ -540,7 +540,7 @@ public final class EntityAuth: NSObject, ObservableObject {
                                     let doc = item.organization,
                                     let id = doc._id
                                 else {
-                                    orgLogger.error("Active organization missing identifier")
+                                    self.orgLogger.error("Active organization missing identifier")
                                     return nil
                                 }
                                 let props = doc.properties ?? OrgItem.OrgDoc.Props(name: nil, slug: nil, memberCount: nil, description: nil)
