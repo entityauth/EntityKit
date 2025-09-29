@@ -15,9 +15,35 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "EntityAuthCore",
+            dependencies: []
+        ),
+        .target(
+            name: "EntityAuthNetworking",
+            dependencies: ["EntityAuthCore"]
+        ),
+        .target(
+            name: "EntityAuthDomain",
+            dependencies: [
+                "EntityAuthCore",
+                "EntityAuthNetworking",
+                "EntityAuthRealtime"
+            ]
+        ),
+        .target(
+            name: "EntityAuthRealtime",
+            dependencies: [
+                "EntityAuthCore",
+                .product(name: "ConvexMobile", package: "convex-swift")
+            ]
+        ),
+        .target(
             name: "EntityKit",
             dependencies: [
-                .product(name: "ConvexMobile", package: "convex-swift")
+                "EntityAuthCore",
+                "EntityAuthNetworking",
+                "EntityAuthDomain",
+                "EntityAuthRealtime"
             ]
         ),
         .testTarget(name: "EntityKitTests", dependencies: ["EntityKit"])

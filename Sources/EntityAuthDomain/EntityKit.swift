@@ -1,3 +1,2 @@
 @_exported import EntityAuthCore
 @_exported import EntityAuthNetworking
-@_exported import EntityAuthDomain

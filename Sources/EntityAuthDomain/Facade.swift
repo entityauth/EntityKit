@@ -1,0 +1,340 @@
+import Foundation
+import Combine
+import EntityAuthCore
+import EntityAuthNetworking
+import EntityAuthRealtime
+
+public protocol EntityAuthFacadeType: Sendable {
+    func currentSnapshot() async -> EntityAuthFacade.Snapshot
+    func snapshotStream() -> AsyncStream<EntityAuthFacade.Snapshot>
+    func updateBaseURL(_ baseURL: URL) async
+    func register(request: RegisterRequest) async throws
+    func login(request: LoginRequest) async throws
+    func logout() async throws
+    func refreshTokens() async throws
+    func organizations() async throws -> [OrganizationSummary]
+    func activeOrganization() async throws -> ActiveOrganization?
+    func setUsername(_ username: String) async throws
+    func checkUsername(_ value: String) async throws -> UsernameCheckResponse
+}
+
+public actor EntityAuthFacade {
+    public struct Dependencies {
+        public var config: EntityAuthConfig
+        public var baseURLStore: BaseURLPersisting
+        public var authState: AuthState
+        public var authService: any (AuthProviding & RefreshService)
+        public var organizationService: OrganizationsProviding
+        public var userService: UsersProviding
+        public var sessionService: SessionsProviding
+        public var refreshHandler: TokenRefresher
+        public var apiClient: any APIClientType
+        public var realtime: RealtimeSubscriptionHandling
+        public init(
+            config: EntityAuthConfig,
+            baseURLStore: BaseURLPersisting,
+            authState: AuthState,
+            authService: any (AuthProviding & RefreshService),
+            organizationService: OrganizationsProviding,
+            userService: UsersProviding,
+            sessionService: SessionsProviding,
+            refreshHandler: TokenRefresher,
+            apiClient: any APIClientType,
+            realtime: RealtimeSubscriptionHandling
+        ) {
+            self.config = config
+            self.baseURLStore = baseURLStore
+            self.authState = authState
+            self.authService = authService
+            self.organizationService = organizationService
+            self.userService = userService
+            self.sessionService = sessionService
+            self.refreshHandler = refreshHandler
+            self.apiClient = apiClient
+            self.realtime = realtime
+        }
+    }
+
+    struct DependenciesBuilder {
+        let config: EntityAuthConfig
+
+        func build() -> Dependencies {
+            let baseURLStore = UserDefaultsBaseURLStore(suiteName: config.userDefaultsSuiteName)
+            let tokenStore = KeychainTokenStore()
+            let authState = AuthState(tokenStore: tokenStore)
+            var finalConfig = config
+            if let persisted = baseURLStore.loadBaseURL() {
+                finalConfig.baseURL = persisted
+            }
+            let refresher = TokenRefresher(authState: authState, refreshService: DummyRefreshService())
+            let client = APIClient(
+                config: finalConfig,
+                authState: authState,
+                refreshHandler: refresher
+            )
+            let authService = AuthService(client: client)
+            let organizationService = OrganizationService(client: client)
+            let userService = UserService(client: client)
+            let sessionService = SessionService(client: client)
+            let realtime = RealtimeCoordinator(baseURL: finalConfig.baseURL) { baseURL in
+                let request = APIRequest(method: .get, path: "/api/convex", requiresAuthentication: false)
+                let data = try await client.send(request)
+                struct ConvexConfig: Decodable { let convexUrl: String }
+                let decoded = try JSONDecoder().decode(ConvexConfig.self, from: data)
+                return decoded.convexUrl
+            }
+            return Dependencies(
+                config: finalConfig,
+                baseURLStore: baseURLStore,
+                authState: authState,
+                authService: authService,
+                organizationService: organizationService,
+                userService: userService,
+                sessionService: sessionService,
+                refreshHandler: refresher,
+                apiClient: client,
+                realtime: realtime
+            )
+        }
+    }
+
+    public struct Snapshot: Sendable {
+        public var accessToken: String?
+        public var refreshToken: String?
+        public var sessionId: String?
+        public var userId: String?
+        public var username: String?
+        public var organizations: [OrganizationSummary]
+        public var activeOrganization: ActiveOrganization?
+
+        public init(
+            accessToken: String?,
+            refreshToken: String?,
+            sessionId: String?,
+            userId: String?,
+            username: String?,
+            organizations: [OrganizationSummary],
+            activeOrganization: ActiveOrganization?
+        ) {
+            self.accessToken = accessToken
+            self.refreshToken = refreshToken
+            self.sessionId = sessionId
+            self.userId = userId
+            self.username = username
+            self.organizations = organizations
+            self.activeOrganization = activeOrganization
+        }
+    }
+
+    private let authState: AuthState
+    private let dependencies: Dependencies
+    private var snapshot: Snapshot
+    private let subject: CurrentValueSubject<Snapshot, Never>
+    private var realtimeCancellable: AnyCancellable?
+
+    public nonisolated var snapshotPublisher: AnyPublisher<Snapshot, Never> {
+        subject.eraseToAnyPublisher()
+    }
+
+    public init(config: EntityAuthConfig) {
+        let builder = DependenciesBuilder(config: config)
+        let dependencies = builder.build()
+        self.authState = dependencies.authState
+        self.dependencies = dependencies
+        self.snapshot = Snapshot(
+            accessToken: authState.currentTokens.accessToken,
+            refreshToken: authState.currentTokens.refreshToken,
+            sessionId: nil,
+            userId: nil,
+            username: nil,
+            organizations: [],
+            activeOrganization: nil
+        )
+        self.subject = CurrentValueSubject(snapshot)
+        Task {
+            await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
+        }
+        realtimeCancellable = dependencies.realtime.publisher().sink { [weak self] event in
+            Task { await self?.handle(event: event) }
+        }
+    }
+
+    public init(dependencies: Dependencies, state: Snapshot) {
+        self.dependencies = dependencies
+        self.authState = dependencies.authState
+        self.snapshot = state
+        self.subject = CurrentValueSubject(state)
+        Task {
+            await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
+        }
+        realtimeCancellable = dependencies.realtime.publisher().sink { [weak self] event in
+            Task { await self?.handle(event: event) }
+        }
+    }
+
+    public nonisolated func publisher() -> AnyPublisher<Snapshot, Never> {
+        subject.eraseToAnyPublisher()
+    }
+
+    public func snapshotStream() -> AsyncStream<Snapshot> {
+        let subject = subject
+        return AsyncStream { continuation in
+            let cancellable = subject.sink { value in
+                continuation.yield(value)
+            }
+            continuation.onTermination = { @Sendable _ in
+                cancellable.cancel()
+            }
+        }
+    }
+
+    public func currentSnapshot() -> Snapshot {
+        snapshot
+    }
+
+    public func updateBaseURL(_ baseURL: URL) async {
+        dependencies.baseURLStore.save(baseURL: baseURL)
+        dependencies.apiClient.updateConfiguration { config in
+            config.baseURL = baseURL
+        }
+        dependencies.realtime.update(baseURL: baseURL)
+    }
+
+    public func register(request: RegisterRequest) async throws {
+        try await dependencies.authService.register(request: request)
+    }
+
+    public func login(request: LoginRequest) async throws {
+        let response = try await dependencies.authService.login(request: request)
+        try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        snapshot.accessToken = response.accessToken
+        snapshot.refreshToken = response.refreshToken
+        snapshot.sessionId = response.sessionId
+        snapshot.userId = response.userId
+        subject.send(snapshot)
+        if let userId = snapshot.userId {
+            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        }
+        try await refreshUserData()
+    }
+
+    public func logout() async throws {
+        try await dependencies.authService.logout(sessionId: snapshot.sessionId, refreshToken: snapshot.refreshToken)
+        try authState.clear()
+        snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
+        subject.send(snapshot)
+        await dependencies.realtime.stop()
+    }
+
+    public func refreshTokens() async throws {
+        let response = try await dependencies.authService.refresh()
+        try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        snapshot.accessToken = response.accessToken
+        snapshot.refreshToken = response.refreshToken
+        subject.send(snapshot)
+    }
+
+    public func organizations() async throws -> [OrganizationSummary] {
+        try await dependencies.organizationService.list().map { $0.asDomain }
+    }
+
+    public func createOrganization(name: String, slug: String, ownerId: String) async throws {
+        try await dependencies.organizationService.create(name: name, slug: slug, ownerId: ownerId)
+        try await refreshUserData()
+    }
+
+    public func addMember(orgId: String, userId: String, role: String) async throws {
+        try await dependencies.organizationService.addMember(orgId: orgId, userId: userId, role: role)
+        try await refreshUserData()
+    }
+
+    public func switchOrg(orgId: String) async throws {
+        try await dependencies.organizationService.switchOrg(orgId: orgId)
+        try await refreshUserData()
+    }
+
+    public func activeOrganization() async throws -> ActiveOrganization? {
+        try await dependencies.organizationService.active()?.asDomain
+    }
+
+    public func setUsername(_ username: String) async throws {
+        try await dependencies.userService.setUsername(username)
+        snapshot.username = username
+        subject.send(snapshot)
+    }
+
+    public func checkUsername(_ value: String) async throws -> UsernameCheckResponse {
+        try await dependencies.userService.checkUsername(value)
+    }
+
+    public func fetchGraphQL<T: Decodable>(query: String, variables: [String: Any]?) async throws -> T {
+        let data = try GraphQLRequestBuilder.make(query: query, variables: variables)
+        let request = APIRequest(method: .post, path: "/api/graphql", body: data)
+        let response = try await dependencies.apiClient.send(request)
+        do {
+            let wrapper = try JSONDecoder().decode(GraphQLWrapper<T>.self, from: response)
+            guard let data = wrapper.data else { throw EntityAuthError.invalidResponse }
+            return data
+        } catch let error as DecodingError {
+            throw EntityAuthError.decoding(error)
+        }
+    }
+
+    private func refreshUserData() async throws {
+        let organizations = try await dependencies.organizationService.list().map { $0.asDomain }
+        let active = try await dependencies.organizationService.active()?.asDomain
+        snapshot.organizations = organizations
+        snapshot.activeOrganization = active
+        subject.send(snapshot)
+    }
+
+    private func handle(event: RealtimeEvent) async {
+        switch event {
+        case let .username(value):
+            snapshot.username = value
+        case let .organizations(orgs):
+            snapshot.organizations = orgs.map { $0.asDomain }
+        case let .activeOrganization(org):
+            snapshot.activeOrganization = org.map { $0.asDomain }
+        case .sessionInvalid:
+            snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
+            try? authState.clear()
+        }
+        subject.send(snapshot)
+    }
+}
+
+private final class DummyRefreshService: RefreshService {
+    func refresh() async throws -> RefreshResponse {
+        throw EntityAuthError.refreshFailed
+    }
+}
+
+private extension RealtimeOrganizationSummary {
+    var asDomain: OrganizationSummary {
+        OrganizationSummary(
+            orgId: orgId,
+            name: name,
+            slug: slug,
+            memberCount: memberCount,
+            role: role,
+            joinedAt: joinedAt,
+            workspaceTenantId: workspaceTenantId
+        )
+    }
+}
+
+private extension RealtimeActiveOrganization {
+    var asDomain: ActiveOrganization {
+        ActiveOrganization(
+            orgId: orgId,
+            name: name,
+            slug: slug,
+            memberCount: memberCount,
+            role: role,
+            joinedAt: joinedAt,
+            workspaceTenantId: workspaceTenantId,
+            description: description
+        )
+    }
+}
