@@ -66,7 +66,7 @@ public struct ActiveOrganization: Identifiable, Hashable, Codable, Sendable {
 extension OrganizationSummaryDTO {
     var asDomain: OrganizationSummary {
         OrganizationSummary(
-            orgId: id,
+            orgId: orgId,
             name: name,
             slug: slug,
             memberCount: memberCount,
@@ -80,7 +80,7 @@ extension OrganizationSummaryDTO {
 extension ActiveOrganizationDTO {
     var asDomain: ActiveOrganization {
         ActiveOrganization(
-            orgId: id,
+            orgId: orgId,
             name: name,
             slug: slug,
             memberCount: memberCount,

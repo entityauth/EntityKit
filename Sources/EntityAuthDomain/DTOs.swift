@@ -36,7 +36,7 @@ public struct RegisterResponse: Decodable, Sendable {
 }
 
 public struct OrganizationSummaryDTO: Decodable, Sendable {
-    public let id: String
+    public let orgId: String
     public let name: String?
     public let slug: String?
     public let memberCount: Int?
@@ -46,7 +46,7 @@ public struct OrganizationSummaryDTO: Decodable, Sendable {
 }
 
 public struct ActiveOrganizationDTO: Decodable, Sendable {
-    public let id: String
+    public let orgId: String
     public let name: String?
     public let slug: String?
     public let memberCount: Int?
