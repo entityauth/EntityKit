@@ -14,8 +14,6 @@ public protocol EntityAuthFacadeType: Sendable {
     func refreshTokens() async throws
     func organizations() async throws -> [OrganizationSummary]
     func activeOrganization() async throws -> ActiveOrganization?
-    func setUsername(_ username: String) async throws
-    func checkUsername(_ value: String) async throws -> UsernameCheckResponse
 }
 
 public actor EntityAuthFacade {
@@ -25,8 +23,6 @@ public actor EntityAuthFacade {
         public var authState: AuthState
         public var authService: any (AuthProviding & RefreshService)
         public var organizationService: OrganizationsProviding
-        public var userService: UsersProviding
-        public var sessionService: SessionsProviding
         public var refreshHandler: TokenRefresher
         public var apiClient: any APIClientType
         public var realtime: RealtimeSubscriptionHandling
@@ -36,8 +32,6 @@ public actor EntityAuthFacade {
             authState: AuthState,
             authService: any (AuthProviding & RefreshService),
             organizationService: OrganizationsProviding,
-            userService: UsersProviding,
-            sessionService: SessionsProviding,
             refreshHandler: TokenRefresher,
             apiClient: any APIClientType,
             realtime: RealtimeSubscriptionHandling
@@ -47,8 +41,6 @@ public actor EntityAuthFacade {
             self.authState = authState
             self.authService = authService
             self.organizationService = organizationService
-            self.userService = userService
-            self.sessionService = sessionService
             self.refreshHandler = refreshHandler
             self.apiClient = apiClient
             self.realtime = realtime
@@ -74,8 +66,6 @@ public actor EntityAuthFacade {
             )
             let authService = AuthService(client: client)
             let organizationService = OrganizationService(client: client)
-            let userService = UserService(client: client)
-            let sessionService = SessionService(client: client)
             let realtime = RealtimeCoordinator(baseURL: finalConfig.baseURL) { baseURL in
                 let request = APIRequest(method: .get, path: "/api/convex", requiresAuthentication: false)
                 let data = try await client.send(request)
@@ -89,8 +79,6 @@ public actor EntityAuthFacade {
                 authState: authState,
                 authService: authService,
                 organizationService: organizationService,
-                userService: userService,
-                sessionService: sessionService,
                 refreshHandler: refresher,
                 apiClient: client,
                 realtime: realtime
@@ -258,13 +246,13 @@ public actor EntityAuthFacade {
     }
 
     public func setUsername(_ username: String) async throws {
-        try await dependencies.userService.setUsername(username)
-        snapshot.username = username
-        subject.send(snapshot)
+        // Removed: legacy HTTP user mutation is not supported under generic model
+        throw EntityAuthError.invalidResponse
     }
 
     public func checkUsername(_ value: String) async throws -> UsernameCheckResponse {
-        try await dependencies.userService.checkUsername(value)
+        // Removed: legacy HTTP user check is not supported under generic model
+        return UsernameCheckResponse(valid: true, available: false)
     }
 
     public func fetchGraphQL<T: Decodable>(query: String, variables: [String: Any]?) async throws -> T {

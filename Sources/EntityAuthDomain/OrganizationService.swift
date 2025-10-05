@@ -29,25 +29,40 @@ public final class OrganizationService: OrganizationsProviding {
     }
 
     public func create(workspaceTenantId: String, name: String, slug: String, ownerId: String) async throws {
-        let payload = [
+        // Generic entity create: kind=org
+        let payload: [String: Any] = [
+            "op": "create",
             "workspaceTenantId": workspaceTenantId,
-            "name": name,
-            "slug": slug,
-            "ownerId": ownerId
+            "kind": "org",
+            "properties": [
+                "name": name,
+                "slug": slug,
+                "ownerId": ownerId
+            ]
         ]
         let body = try JSONSerialization.data(withJSONObject: payload)
-        let request = APIRequest(method: .post, path: "/api/org/create", body: body)
+        let request = APIRequest(method: .post, path: "/api/entities", body: body)
         _ = try await client.send(request)
     }
 
     public func addMember(orgId: String, userId: String, role: String) async throws {
-        let payload = [
-            "orgId": orgId,
-            "userId": userId,
-            "role": role
+        // Generic relation link: (user)-member_of->(org)
+        guard let workspaceTenantId = client.workspaceTenantId else {
+            throw EntityAuthError.configurationMissingWorkspaceTenantId
+        }
+        let payload: [String: Any] = [
+            "op": "link",
+            "workspaceTenantId": workspaceTenantId,
+            "srcId": userId,
+            "relation": "member_of",
+            "dstId": orgId,
+            "attrs": [
+                "role": role,
+                "joinedAt": Date().timeIntervalSince1970 * 1000
+            ]
         ]
         let body = try JSONSerialization.data(withJSONObject: payload)
-        let request = APIRequest(method: .post, path: "/api/org/add-member", body: body)
+        let request = APIRequest(method: .post, path: "/api/relations", body: body)
         _ = try await client.send(request)
     }
 
@@ -68,23 +83,47 @@ public final class OrganizationService: OrganizationsProviding {
     }
 
     public func switchActive(workspaceTenantId: String, orgId: String) async throws {
-        let payload = ["workspaceTenantId": workspaceTenantId, "orgId": orgId]
-        let body = try JSONSerialization.data(withJSONObject: payload)
-        let request = APIRequest(method: .post, path: "/api/org/switch", body: body)
-        _ = try await client.send(request)
+        // No-op under generic model (active org handled via realtime/state)
     }
 
     public func list() async throws -> [OrganizationSummaryDTO] {
-        let request = APIRequest(method: .get, path: "/api/org/list")
-        struct Response: Decodable { let organizations: [OrganizationSummaryDTO] }
-        let response = try await client.send(request, decode: Response.self)
-        return response.organizations
+        // Resolve current user id via /api/user/me
+        let meReq = APIRequest(method: .get, path: "/api/user/me")
+        let me = try await client.send(meReq, decode: UserResponse.self)
+        // Query memberships via generic relations
+        var orgs: [OrganizationSummaryDTO] = []
+        let params = [
+            URLQueryItem(name: "srcId", value: me.id),
+            URLQueryItem(name: "relation", value: "member_of")
+        ]
+        let relReq = APIRequest(method: .get, path: "/api/relations", queryItems: params)
+        struct RelationDTO: Decodable { let srcId: String; let relation: String; let dstId: String; let attrs: [String: AnyCodable]? }
+        let relations = try await client.send(relReq, decode: [RelationDTO].self)
+        for rel in relations {
+            // Fetch org entity
+            let entReq = APIRequest(method: .get, path: "/api/entities", queryItems: [URLQueryItem(name: "id", value: rel.dstId)])
+            struct EntityDTO: Decodable { let id: String; let properties: [String: AnyCodable]?; let workspaceTenantId: String? }
+            if let entity = try await client.send(entReq, decode: EntityDTO?.self) {
+                let props = entity.properties ?? [:]
+                let role = (rel.attrs?["role"]?.stringValue) ?? "member"
+                let joinedAt = (rel.attrs?["joinedAt"]?.doubleValue) ?? Date().timeIntervalSince1970 * 1000
+                let summary = OrganizationSummaryDTO(
+                    orgId: entity.id,
+                    name: props["name"]?.stringValue,
+                    slug: props["slug"]?.stringValue,
+                    memberCount: nil,
+                    role: role,
+                    joinedAt: joinedAt,
+                    workspaceTenantId: entity.workspaceTenantId
+                )
+                orgs.append(summary)
+            }
+        }
+        return orgs
     }
 
     public func active() async throws -> ActiveOrganizationDTO? {
-        let request = APIRequest(method: .get, path: "/api/org/active")
-        struct Response: Decodable { let organization: ActiveOrganizationDTO? }
-        let response = try await client.send(request, decode: Response.self)
-        return response.organization
+        // Not supported via generic HTTP; active org is derived from realtime
+        return nil
     }
 }
