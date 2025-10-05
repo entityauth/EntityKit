@@ -53,3 +53,20 @@ public struct AnyCodable: Codable, Sendable {
         }
     }
 }
+
+// Typed accessors to make downstream decoding safer without throwing
+public extension AnyCodable {
+    var stringValue: String? {
+        if let s = value as? String { return s }
+        if let n = value as? NSNumber { return n.stringValue }
+        return nil
+    }
+
+    var doubleValue: Double? {
+        if let d = value as? Double { return d }
+        if let i = value as? Int { return Double(i) }
+        if let n = value as? NSNumber { return n.doubleValue }
+        if let s = value as? String, let d = Double(s) { return d }
+        return nil
+    }
+}

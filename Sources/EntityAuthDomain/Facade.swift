@@ -254,7 +254,7 @@ public actor EntityAuthFacade {
         let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
         guard let userId = snapshot.userId else { throw EntityAuthError.unauthorized }
-        let slug = normalize(trimmed)
+        let slug = normalizeUsername(trimmed)
         try await dependencies.entitiesService.updateEnforced(
             id: userId,
             patch: [
@@ -271,7 +271,7 @@ public actor EntityAuthFacade {
     public func checkUsername(_ value: String) async throws -> UsernameCheckResponse {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return UsernameCheckResponse(valid: false, available: false) }
-        let slug = normalize(trimmed)
+        let slug = normalizeUsername(trimmed)
         guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else {
             return UsernameCheckResponse(valid: false, available: false)
         }
