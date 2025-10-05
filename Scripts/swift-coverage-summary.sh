@@ -28,53 +28,60 @@ PY
   fi
 fi
 
-# Fallback to llvm-cov using profdata
-# Prefer the path reported by SwiftPM itself only if it ends with .profdata (ignore JSON)
-PROF=""
-PROF_CANDIDATE=$(swift test --show-codecov-path 2>/dev/null || true)
-if [[ -n "${PROF_CANDIDATE}" && -f "${PROF_CANDIDATE}" && "${PROF_CANDIDATE}" == *.profdata ]]; then
-  PROF="${PROF_CANDIDATE}"
+# Try SwiftPM-generated JSON coverage (newer toolchains)
+JSON_COVERAGE=$(swift test --show-codecov-path 2>/dev/null || true)
+if [[ -z "${JSON_COVERAGE}" || ! -f "${JSON_COVERAGE}" || "${JSON_COVERAGE}" != *.json ]]; then
+  JSON_COVERAGE=$(find .build -type f -path "*/debug/codecov/*.json" -print 2>/dev/null | sort -r | head -n1 || true)
 fi
-if [[ -z "${PROF}" ]]; then
-  # Prefer default.profdata when present
-  if DEFAULT_PROF=$(find .build -type f -path "*/debug/codecov/default.profdata" -print 2>/dev/null | head -n1); then
-    PROF="${DEFAULT_PROF}"
+if [[ -n "${JSON_COVERAGE}" && -f "${JSON_COVERAGE}" ]]; then
+  TOTAL=$(JSON_FILE="${JSON_COVERAGE}" /usr/bin/python3 - <<'PY'
+import json, os
+try:
+  with open(os.environ['JSON_FILE']) as f:
+    j=json.load(f)
+  # SwiftPM exports llvm.coverage.json.export with data[0].totals.lines.percent
+  d=j.get('data',[])
+  if d and 'totals' in d[0] and 'lines' in d[0]['totals']:
+    pct=d[0]['totals']['lines'].get('percent')
+    if pct is not None:
+      print(f"total: {pct:.2f}%")
+except Exception:
+  pass
+PY
+  ) || true
+  if [[ -n "${TOTAL}" ]]; then
+    echo "Swift coverage ${TOTAL} (spm json)"
+    echo "Per-target:"
+    JSON_FILE="${JSON_COVERAGE}" /usr/bin/python3 - <<'PY'
+import json, os
+with open(os.environ['JSON_FILE']) as f:
+  j=json.load(f)
+base=os.getcwd()
+data=j.get('data', [])
+files=(data[0] if data else {}).get('files', [])
+by_target={}
+for f in files:
+  path=f.get('filename','')
+  if not path.startswith(base + '/Sources/'):
+    continue
+  rest=path[len(base + '/Sources/'):]
+  if '/' not in rest:
+    continue
+  target=rest.split('/',1)[0]
+  ls=f.get('summary',{}).get('lines',{})
+  count=int(ls.get('count') or 0)
+  covered=int(ls.get('covered') or 0)
+  if count<=0:
+    continue
+  cov, tot = by_target.get(target, (0,0))
+  by_target[target]=(cov+covered, tot+count)
+for t in sorted(by_target.keys()):
+  covered, count = by_target[t]
+  pct = 0.0 if count==0 else (covered/count)*100.0
+  print(f"- {t}: {pct:.2f}% ({covered}/{count})")
+PY
+    exit 0
   fi
 fi
-if [[ -z "${PROF}" ]]; then
-  # Otherwise pick the newest .profdata in codecov folder
-  PROF=$(find .build -type f -name "*.profdata" -path "*/debug/codecov/*" -print 2>/dev/null | sort -r | head -n1 || true)
-fi
-if [[ -z "${PROF}" ]]; then
-  echo "No coverage artifacts found. Ensure 'swift test --enable-code-coverage' was run."
-  exit 0
-fi
 
-# Locate the test binary (avoid matching files nested under dSYM inside the bundle)
-TEST_BIN=$(find .build -type f -regex ".*/EntityKitPackageTests\\.xctest/Contents/MacOS/[^/]+$" | head -n1 || true)
-if [[ -z "${TEST_BIN}" ]]; then
-  # Try a generic test binary
-  TEST_BIN=$(find .build -type f -regex ".*/[^/]*Tests$" | head -n1 || true)
-fi
-
-if [[ -z "${TEST_BIN}" ]]; then
-  echo "Could not locate test binary for llvm-cov report"
-  exit 0
-fi
-
-if ! command -v xcrun >/dev/null; then
-  echo "xcrun not found; skipping coverage summary"
-  exit 0
-fi
-
-echo "Swift coverage (llvm-cov)"
-if REPORT_OUT=$(xcrun llvm-cov report "${TEST_BIN}" -instr-profile "${PROF}" 2>&1); then
-  echo "${REPORT_OUT}"
-else
-  # Hide noisy llvm-cov errors on newer toolchains that emit unsupported formats
-  if echo "${REPORT_OUT}" | grep -qiE "unsupported coverage format version|invalid instrumentation profile data|not recognized as a valid object file"; then
-    echo "Coverage artifacts found, but llvm-cov cannot read them on this toolchain. Skipping summary."
-  else
-    echo "llvm-cov failed:\n${REPORT_OUT}"
-  fi
-fi
+echo "No SwiftPM JSON coverage found and no .xcresult available for xccov; skipping summary."
