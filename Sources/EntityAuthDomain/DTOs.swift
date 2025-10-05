@@ -1,6 +1,6 @@
 import Foundation
 
-public struct LoginRequest: Encodable {
+public struct LoginRequest: Encodable, Sendable {
     public let email: String
     public let password: String
     public let workspaceTenantId: String
@@ -19,7 +19,7 @@ public struct LoginResponse: Decodable, Sendable {
     public let userId: String
 }
 
-public struct RegisterRequest: Encodable {
+public struct RegisterRequest: Encodable, Sendable {
     public let email: String
     public let password: String
     public let workspaceTenantId: String

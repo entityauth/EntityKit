@@ -1,11 +1,11 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "EntityKit",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v13)
+        .iOS(.v26),
+        .macOS(.v26)
     ],
     products: [
         .library(name: "EntityKit", targets: ["EntityKit"])

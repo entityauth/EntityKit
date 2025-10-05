@@ -44,7 +44,7 @@ public protocol BaseURLPersisting: Sendable {
     func save(baseURL: URL)
 }
 
-public struct UserDefaultsBaseURLStore: BaseURLPersisting {
+public struct UserDefaultsBaseURLStore: BaseURLPersisting, @unchecked Sendable {
     private let key = "com.entityauth.baseURL"
     private let defaults: UserDefaults
 

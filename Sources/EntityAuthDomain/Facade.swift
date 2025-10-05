@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+@preconcurrency import Combine
 import EntityAuthCore
 import EntityAuthNetworking
 import EntityAuthRealtime
@@ -125,7 +125,7 @@ public actor EntityAuthFacade {
     private let subject: CurrentValueSubject<Snapshot, Never>
     private var realtimeCancellable: AnyCancellable?
 
-    public nonisolated var snapshotPublisher: AnyPublisher<Snapshot, Never> {
+    public var snapshotPublisher: AnyPublisher<Snapshot, Never> {
         subject.eraseToAnyPublisher()
     }
 
@@ -144,12 +144,7 @@ public actor EntityAuthFacade {
             activeOrganization: nil
         )
         self.subject = CurrentValueSubject(snapshot)
-        Task {
-            await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
-        }
-        realtimeCancellable = dependencies.realtime.publisher().sink { [weak self] event in
-            Task { await self?.handle(event: event) }
-        }
+        Task { await self.initializeAsync() }
     }
 
     public init(dependencies: Dependencies, state: Snapshot) {
@@ -157,15 +152,10 @@ public actor EntityAuthFacade {
         self.authState = dependencies.authState
         self.snapshot = state
         self.subject = CurrentValueSubject(state)
-        Task {
-            await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
-        }
-        realtimeCancellable = dependencies.realtime.publisher().sink { [weak self] event in
-            Task { await self?.handle(event: event) }
-        }
+        Task { await self.initializeAsync() }
     }
 
-    public nonisolated func publisher() -> AnyPublisher<Snapshot, Never> {
+    public func publisher() -> AnyPublisher<Snapshot, Never> {
         subject.eraseToAnyPublisher()
     }
 
@@ -175,9 +165,7 @@ public actor EntityAuthFacade {
             let cancellable = subject.sink { value in
                 continuation.yield(value)
             }
-            continuation.onTermination = { @Sendable _ in
-                cancellable.cancel()
-            }
+            continuation.onTermination = { _ in cancellable.cancel() }
         }
     }
 
@@ -194,11 +182,13 @@ public actor EntityAuthFacade {
     }
 
     public func register(request: RegisterRequest) async throws {
-        try await dependencies.authService.register(request: request)
+        let req = request
+        try await dependencies.authService.register(request: req)
     }
 
     public func login(request: LoginRequest) async throws {
-        let response = try await dependencies.authService.login(request: request)
+        let req = request
+        let response = try await dependencies.authService.login(request: req)
         try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
         snapshot.accessToken = response.accessToken
         snapshot.refreshToken = response.refreshToken
@@ -255,7 +245,7 @@ public actor EntityAuthFacade {
         guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
         guard let userId = snapshot.userId else { throw EntityAuthError.unauthorized }
         let slug = normalizeUsername(trimmed)
-        try await dependencies.entitiesService.updateEnforced(
+        let _ = try await dependencies.entitiesService.updateEnforced(
             id: userId,
             patch: [
                 "properties": ["username": trimmed],
@@ -324,6 +314,19 @@ public actor EntityAuthFacade {
             try? authState.clear()
         }
         subject.send(snapshot)
+    }
+}
+
+extension EntityAuthFacade {
+    private func initializeAsync() async {
+        await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
+        setupRealtimeSubscriptions()
+    }
+    private func setupRealtimeSubscriptions() {
+        realtimeCancellable = dependencies.realtime.publisher().sink { [weak self] event in
+            guard let self else { return }
+            Task { await self.handle(event: event) }
+        }
     }
 }
 

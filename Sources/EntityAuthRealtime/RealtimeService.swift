@@ -76,10 +76,29 @@ public protocol RealtimeSubscriptionHandling: Sendable {
     func publisher() -> AnyPublisher<RealtimeEvent, Never>
 }
 
-public final class RealtimeCoordinator: RealtimeSubscriptionHandling {
+public protocol ConvexSubscribing {
+    func subscribe<T: Decodable>(to: String, with: [String: Any], yielding: T.Type) -> AnyPublisher<T, Error>
+}
+
+public struct ConvexClientAdapter: ConvexSubscribing {
+    public let client: ConvexClient
+    public init(client: ConvexClient) { self.client = client }
+    public func subscribe<T: Decodable>(to: String, with: [String: Any], yielding: T.Type) -> AnyPublisher<T, Error> {
+        let params: [String: (any ConvexEncodable)?] = with.mapValues { value in
+            value as? (any ConvexEncodable)
+        }
+        return client
+            .subscribe(to: to, with: params, yielding: T.self)
+            .mapError { $0 as Error }
+            .eraseToAnyPublisher()
+    }
+}
+
+public final class RealtimeCoordinator: RealtimeSubscriptionHandling, @unchecked Sendable {
     private var baseURL: URL
     private let fetchConvexURL: @Sendable (URL) async throws -> String
-    private var convexClient: ConvexClient?
+    private var convexClient: ConvexSubscribing?
+    private let clientFactory: (String) -> ConvexSubscribing
 
     private let events = PassthroughSubject<RealtimeEvent, Never>()
 
@@ -87,9 +106,12 @@ public final class RealtimeCoordinator: RealtimeSubscriptionHandling {
     private var organizationsCancellable: AnyCancellable?
     private var sessionCancellable: AnyCancellable?
 
-    public init(baseURL: URL, fetchConvexURL: @escaping @Sendable (URL) async throws -> String) {
+    public init(baseURL: URL, fetchConvexURL: @escaping @Sendable (URL) async throws -> String, clientFactory: @escaping (String) -> ConvexSubscribing = { url in
+        ConvexClientAdapter(client: ConvexClient(deploymentUrl: url))
+    }) {
         self.baseURL = baseURL
         self.fetchConvexURL = fetchConvexURL
+        self.clientFactory = clientFactory
     }
 
     public func publisher() -> AnyPublisher<RealtimeEvent, Never> {
@@ -187,21 +209,21 @@ public final class RealtimeCoordinator: RealtimeSubscriptionHandling {
         convexClient = nil
     }
 
-    private func ensureClient() async throws -> ConvexClient {
+    private func ensureClient() async throws -> ConvexSubscribing {
         if let convexClient { return convexClient }
         let convexURL = try await fetchConvexURL(baseURL)
-        let client = ConvexClient(deploymentUrl: convexURL)
+        let client = clientFactory(convexURL)
         convexClient = client
         return client
     }
 }
 
-private struct UserRecord: Decodable {
+struct UserRecord: Decodable {
     struct Properties: Decodable { let username: String? }
     let properties: Properties?
 }
 
-private struct OrganizationRecord: Decodable {
+struct OrganizationRecord: Decodable {
     struct Organization: Decodable {
         struct Properties: Decodable {
             let name: String?
@@ -218,7 +240,7 @@ private struct OrganizationRecord: Decodable {
     let joinedAt: Double?
 }
 
-private struct SessionRecord: Decodable {
+struct SessionRecord: Decodable {
     let status: String?
 }
  

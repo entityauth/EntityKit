@@ -10,7 +10,7 @@ public protocol APIClientType: Sendable {
     var workspaceTenantId: String? { get }
 }
 
-public final class APIClient: APIClientType {
+public final class APIClient: APIClientType, @unchecked Sendable {
     private var config: EntityAuthConfig
     private let authState: AuthState
     private let urlSession: URLSession

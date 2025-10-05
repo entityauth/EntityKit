@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-public final class AuthState: Sendable {
+public final class AuthState: @unchecked Sendable {
     public struct Tokens: Equatable, Sendable {
         public var accessToken: String?
         public var refreshToken: String?

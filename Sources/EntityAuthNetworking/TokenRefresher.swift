@@ -33,8 +33,7 @@ public actor TokenRefresher: TokenRefreshHandling {
             do {
                 let response = try await refreshService.refresh()
                 try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
-                let data = try await operationCopy()
-                return data
+                return try await operationCopy()
             } catch let error as EntityAuthError {
                 throw error
             } catch {
@@ -44,17 +43,15 @@ public actor TokenRefresher: TokenRefreshHandling {
         inFlightTask = task
         do {
             let result = try await task.value
-            await cleanup()
+            cleanup()
             return result
         } catch {
-            await cleanup()
+            cleanup()
             throw error
         }
     }
 
-    private func cleanup() {
-        inFlightTask = nil
-    }
+    private func cleanup() { inFlightTask = nil }
 
     public func replaceRefreshService(with service: RefreshService) {
         refreshService = service
