@@ -23,6 +23,7 @@ public actor EntityAuthFacade {
         public var authState: AuthState
         public var authService: any (AuthProviding & RefreshService)
         public var organizationService: OrganizationsProviding
+        public var entitiesService: EntitiesProviding
         public var refreshHandler: TokenRefresher
         public var apiClient: any APIClientType
         public var realtime: RealtimeSubscriptionHandling
@@ -32,6 +33,7 @@ public actor EntityAuthFacade {
             authState: AuthState,
             authService: any (AuthProviding & RefreshService),
             organizationService: OrganizationsProviding,
+            entitiesService: EntitiesProviding,
             refreshHandler: TokenRefresher,
             apiClient: any APIClientType,
             realtime: RealtimeSubscriptionHandling
@@ -41,6 +43,7 @@ public actor EntityAuthFacade {
             self.authState = authState
             self.authService = authService
             self.organizationService = organizationService
+            self.entitiesService = entitiesService
             self.refreshHandler = refreshHandler
             self.apiClient = apiClient
             self.realtime = realtime
@@ -66,6 +69,7 @@ public actor EntityAuthFacade {
             )
             let authService = AuthService(client: client)
             let organizationService = OrganizationService(client: client)
+            let entitiesService = EntitiesService(client: client)
             let realtime = RealtimeCoordinator(baseURL: finalConfig.baseURL) { baseURL in
                 let request = APIRequest(method: .get, path: "/api/convex", requiresAuthentication: false)
                 let data = try await client.send(request)
@@ -79,6 +83,7 @@ public actor EntityAuthFacade {
                 authState: authState,
                 authService: authService,
                 organizationService: organizationService,
+                entitiesService: entitiesService,
                 refreshHandler: refresher,
                 apiClient: client,
                 realtime: realtime
@@ -246,13 +251,43 @@ public actor EntityAuthFacade {
     }
 
     public func setUsername(_ username: String) async throws {
-        // Removed: legacy HTTP user mutation is not supported under generic model
-        throw EntityAuthError.invalidResponse
+        let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
+        guard let userId = snapshot.userId else { throw EntityAuthError.unauthorized }
+        let slug = normalize(trimmed)
+        try await dependencies.entitiesService.updateEnforced(
+            id: userId,
+            patch: [
+                "properties": ["username": trimmed],
+                "metadata": ["usernameSlug": slug]
+            ],
+            actorId: userId
+        )
+        // UI will update via realtime; optimistic reflect username
+        snapshot.username = trimmed
+        subject.send(snapshot)
     }
 
     public func checkUsername(_ value: String) async throws -> UsernameCheckResponse {
-        // Removed: legacy HTTP user check is not supported under generic model
-        return UsernameCheckResponse(valid: true, available: false)
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return UsernameCheckResponse(valid: false, available: false) }
+        let slug = normalize(trimmed)
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else {
+            return UsernameCheckResponse(valid: false, available: false)
+        }
+        let results = try await dependencies.entitiesService.list(
+            workspaceTenantId: workspaceTenantId,
+            kind: "user",
+            filter: ListEntitiesFilter(status: "active", email: nil, slug: slug),
+            limit: 1
+        )
+        // Available if none found or found id equals current user
+        let foundId = results.first?.id
+        let available: Bool = {
+            if let foundId, let current = snapshot.userId { return foundId == current }
+            return results.isEmpty
+        }()
+        return UsernameCheckResponse(valid: true, available: available)
     }
 
     public func fetchGraphQL<T: Decodable>(query: String, variables: [String: Any]?) async throws -> T {

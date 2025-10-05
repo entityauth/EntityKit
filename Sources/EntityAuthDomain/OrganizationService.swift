@@ -29,9 +29,9 @@ public final class OrganizationService: OrganizationsProviding {
     }
 
     public func create(workspaceTenantId: String, name: String, slug: String, ownerId: String) async throws {
-        // Generic entity create: kind=org
+        // Generic entity create (enforced): kind=org
         let payload: [String: Any] = [
-            "op": "create",
+            "op": "createEnforced",
             "workspaceTenantId": workspaceTenantId,
             "kind": "org",
             "properties": [
@@ -101,7 +101,9 @@ public final class OrganizationService: OrganizationsProviding {
         let relations = try await client.send(relReq, decode: [RelationDTO].self)
         for rel in relations {
             // Fetch org entity
-            let entReq = APIRequest(method: .get, path: "/api/entities", queryItems: [URLQueryItem(name: "id", value: rel.dstId)])
+            let entReq = APIRequest(method: .get, path: "/api/entities", queryItems: [
+                URLQueryItem(name: "id", value: rel.dstId)
+            ])
             struct EntityDTO: Decodable { let id: String; let properties: [String: AnyCodable]?; let workspaceTenantId: String? }
             if let entity = try await client.send(entReq, decode: EntityDTO?.self) {
                 let props = entity.properties ?? [:]

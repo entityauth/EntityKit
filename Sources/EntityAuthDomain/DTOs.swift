@@ -91,6 +91,29 @@ public struct UserResponse: Decodable, Sendable {
     public let workspaceTenantId: String?
 }
 
+public struct EntityDTO: Decodable, Sendable {
+    public let id: String
+    public let kind: String?
+    public let workspaceTenantId: String?
+    public let properties: [String: AnyCodable]?
+    public let metadata: [String: AnyCodable]?
+    public let status: String?
+    public let createdAt: Double?
+    public let updatedAt: Double?
+}
+
+public struct ListEntitiesFilter: Encodable, Sendable {
+    public var status: String?
+    public var email: String?
+    public var slug: String?
+
+    public init(status: String? = nil, email: String? = nil, slug: String? = nil) {
+        self.status = status
+        self.email = email
+        self.slug = slug
+    }
+}
+
 public struct UserByEmailRequest: Encodable {
     public let email: String
 }
