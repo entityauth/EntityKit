@@ -67,7 +67,7 @@ public actor EntityAuthFacade {
                 authState: authState,
                 refreshHandler: refresher
             )
-            let authService = AuthService(client: client)
+            let authService = AuthService(client: client, authState: authState)
             let organizationService = OrganizationService(client: client)
             let entitiesService = EntitiesService(client: client)
             let realtime = RealtimeCoordinator(baseURL: finalConfig.baseURL) { baseURL in

@@ -113,8 +113,8 @@ final class AuthServiceSmokeTests: XCTestCase {
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
         }
         let client = APIClient(config: config, authState: state, urlSession: session, decoder: JSONDecoder(), encoder: JSONEncoder(), refreshHandler: refresher)
-        let svc = AuthService(client: client)
-        let resp = try await svc.login(request: .init(email: "e@example.com", password: "p", workspaceTenantId: "w"))
+        let svc = AuthService(client: client, authState: state)
+        let resp = try await svc.login(request: LoginRequest(email: "e@example.com", password: "p", workspaceTenantId: "w"))
         XCTAssertEqual(resp.sessionId, "s")
     }
 }

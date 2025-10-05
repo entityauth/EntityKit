@@ -11,9 +11,11 @@ public protocol AuthProviding: Sendable {
 
 public final class AuthService: AuthProviding, RefreshService {
     private let client: APIClientType
+    private let authState: AuthState
 
-    public init(client: APIClientType) {
+    public init(client: APIClientType, authState: AuthState) {
         self.client = client
+        self.authState = authState
     }
 
     public func register(request: RegisterRequest) async throws {
@@ -29,7 +31,11 @@ public final class AuthService: AuthProviding, RefreshService {
     }
 
     public func refresh() async throws -> RefreshResponse {
-        let apiRequest = APIRequest(method: .post, path: "/api/auth/refresh", headers: ["content-type": "application/json"], requiresAuthentication: false)
+        var headers: [String: String] = ["content-type": "application/json"]
+        if let refreshToken = authState.currentTokens.refreshToken {
+            headers["x-refresh-token"] = refreshToken
+        }
+        let apiRequest = APIRequest(method: .post, path: "/api/auth/refresh", headers: headers, requiresAuthentication: false)
         return try await client.send(apiRequest, decode: RefreshResponse.self)
     }
 
