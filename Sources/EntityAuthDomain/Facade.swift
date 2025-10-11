@@ -189,6 +189,7 @@ public actor EntityAuthFacade {
     public func login(request: LoginRequest) async throws {
         let req = request
         let response = try await dependencies.authService.login(request: req)
+        print("[EntityAuthSDK] login — received tokens, sessionId: \(response.sessionId ?? "<nil>") userId: \(response.userId ?? "<nil>")")
         try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
         snapshot.accessToken = response.accessToken
         snapshot.refreshToken = response.refreshToken
@@ -196,6 +197,7 @@ public actor EntityAuthFacade {
         snapshot.userId = response.userId
         subject.send(snapshot)
         if let userId = snapshot.userId {
+            print("[EntityAuthSDK] login — starting realtime for userId: \(userId)")
             await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
         }
         try await refreshUserData()
@@ -210,11 +212,13 @@ public actor EntityAuthFacade {
     }
 
     public func refreshTokens() async throws {
+        print("[EntityAuthSDK] refreshTokens — begin")
         let response = try await dependencies.authService.refresh()
         try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
         snapshot.accessToken = response.accessToken
         snapshot.refreshToken = response.refreshToken
         subject.send(snapshot)
+        print("[EntityAuthSDK] refreshTokens — updated tokens. userId remains: \(snapshot.userId ?? "<nil>")")
     }
 
     public func organizations() async throws -> [OrganizationSummary] {
@@ -310,6 +314,7 @@ public actor EntityAuthFacade {
         case let .activeOrganization(org):
             snapshot.activeOrganization = org.map { $0.asDomain }
         case .sessionInvalid:
+            print("[EntityAuthSDK] realtime — sessionInvalid. Clearing tokens and user state.")
             snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
             try? authState.clear()
         }
@@ -324,12 +329,14 @@ extension EntityAuthFacade {
         // Eagerly hydrate userId on cold start if tokens are present
         if snapshot.userId == nil, dependencies.authState.currentTokens.accessToken != nil {
             do {
+                print("[EntityAuthSDK] initializeAsync — hydrating userId via /api/user/me")
                 let req = APIRequest(method: .get, path: "/api/user/me")
                 let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
                 snapshot.userId = me.id
                 subject.send(snapshot)
+                print("[EntityAuthSDK] initializeAsync — hydrated userId: \(me.id)")
             } catch {
-                // ignore; userId will be set on next successful auth flow
+                print("[EntityAuthSDK] initializeAsync — failed to hydrate userId: \(error.localizedDescription)")
             }
         }
     }
