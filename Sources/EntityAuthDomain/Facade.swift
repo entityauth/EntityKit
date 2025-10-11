@@ -17,6 +17,20 @@ public protocol EntityAuthFacadeType: Sendable {
 }
 
 public actor EntityAuthFacade {
+    private struct LastUserStore {
+        private let userDefaults: UserDefaults
+        private let key = "com.entityauth.lastUserId"
+        init(suiteName: String?) {
+            if let suiteName, let ud = UserDefaults(suiteName: suiteName) {
+                self.userDefaults = ud
+            } else {
+                self.userDefaults = .standard
+            }
+        }
+        func load() -> String? { userDefaults.string(forKey: key) }
+        func save(id: String?) { userDefaults.set(id, forKey: key) }
+        func clear() { userDefaults.removeObject(forKey: key) }
+    }
     public struct Dependencies {
         public var config: EntityAuthConfig
         public var baseURLStore: BaseURLPersisting
@@ -124,6 +138,7 @@ public actor EntityAuthFacade {
     private var snapshot: Snapshot
     private let subject: CurrentValueSubject<Snapshot, Never>
     private var realtimeCancellable: AnyCancellable?
+    private let lastUserStore: LastUserStore
 
     public var snapshotPublisher: AnyPublisher<Snapshot, Never> {
         subject.eraseToAnyPublisher()
@@ -134,6 +149,7 @@ public actor EntityAuthFacade {
         let dependencies = builder.build()
         self.authState = dependencies.authState
         self.dependencies = dependencies
+        self.lastUserStore = LastUserStore(suiteName: dependencies.config.userDefaultsSuiteName)
         self.snapshot = Snapshot(
             accessToken: authState.currentTokens.accessToken,
             refreshToken: authState.currentTokens.refreshToken,
@@ -150,6 +166,7 @@ public actor EntityAuthFacade {
     public init(dependencies: Dependencies, state: Snapshot) {
         self.dependencies = dependencies
         self.authState = dependencies.authState
+        self.lastUserStore = LastUserStore(suiteName: dependencies.config.userDefaultsSuiteName)
         self.snapshot = state
         self.subject = CurrentValueSubject(state)
         Task { await self.initializeAsync() }
@@ -195,6 +212,7 @@ public actor EntityAuthFacade {
         snapshot.refreshToken = response.refreshToken
         snapshot.sessionId = response.sessionId
         snapshot.userId = response.userId
+        lastUserStore.save(id: response.userId)
         subject.send(snapshot)
         if let userId = snapshot.userId {
             print("[EntityAuthSDK] login — starting realtime for userId: \(userId)")
@@ -209,6 +227,7 @@ public actor EntityAuthFacade {
         snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
         subject.send(snapshot)
         await dependencies.realtime.stop()
+        lastUserStore.clear()
     }
 
     public func refreshTokens() async throws {
@@ -323,12 +342,55 @@ public actor EntityAuthFacade {
 }
 
 extension EntityAuthFacade {
+    private func isAccessTokenExpiringSoon(_ jwt: String, skewSeconds: Int = 90) -> Bool {
+        // Very lightweight JWT exp decoder: split by '.', base64url decode payload, read 'exp'
+        let parts = jwt.split(separator: ".")
+        guard parts.count >= 2 else { return false }
+        let payloadPart = String(parts[1])
+        func base64urlToData(_ s: String) -> Data? {
+            var str = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            let padding = (4 - (str.count % 4)) % 4
+            if padding > 0 { str.append(String(repeating: "=", count: padding)) }
+            return Data(base64Encoded: str)
+        }
+        guard let data = base64urlToData(payloadPart),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let exp = json["exp"] as? Double else { return false }
+        let now = Date().timeIntervalSince1970
+        return exp <= (now + Double(skewSeconds))
+    }
+
+    private func shouldAttemptRefresh(after error: Error) -> Bool {
+        // Treat Unauthorized and HTTP 400 with exp claim failures as refreshable
+        if case EntityAuthError.unauthorized = error { return true }
+        if case let EntityAuthError.network(status, message) = error {
+            if status == 400, (message ?? "").lowercased().contains("exp") { return true }
+        }
+        // Also for generic decoding/network that mention exp claim
+        let text = (error as NSError).localizedDescription.lowercased()
+        return text.contains("exp") || text.contains("unauthorized")
+    }
     private func initializeAsync() async {
         await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
         setupRealtimeSubscriptions()
+        // Prefill last-known userId immediately for seamless UI
+        if snapshot.userId == nil, let last = lastUserStore.load() {
+            snapshot.userId = last
+            subject.send(snapshot)
+            print("[EntityAuthSDK] initializeAsync — prefilled last-known userId: \(last)")
+        }
         // Eagerly hydrate userId on cold start if tokens are present
-        if snapshot.userId == nil, dependencies.authState.currentTokens.accessToken != nil {
+        if dependencies.authState.currentTokens.accessToken != nil || dependencies.authState.currentTokens.refreshToken != nil {
             do {
+                let access = dependencies.authState.currentTokens.accessToken
+                if let access, isAccessTokenExpiringSoon(access) {
+                    print("[EntityAuthSDK] initializeAsync — access token expiring soon, refreshing before hydration")
+                    let refreshed = try await dependencies.authService.refresh()
+                    try? dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
+                    snapshot.accessToken = refreshed.accessToken
+                    snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
+                    subject.send(snapshot)
+                }
                 print("[EntityAuthSDK] initializeAsync — hydrating userId via /api/user/me")
                 let req = APIRequest(method: .get, path: "/api/user/me")
                 let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
@@ -336,7 +398,27 @@ extension EntityAuthFacade {
                 subject.send(snapshot)
                 print("[EntityAuthSDK] initializeAsync — hydrated userId: \(me.id)")
             } catch {
-                print("[EntityAuthSDK] initializeAsync — failed to hydrate userId: \(error.localizedDescription)")
+                let description = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
+                print("[EntityAuthSDK] initializeAsync — failed to hydrate userId: \(description)")
+                // If failure indicates expired/invalid access token, attempt one refresh then retry hydration
+                if shouldAttemptRefresh(after: error) {
+                    do {
+                        print("[EntityAuthSDK] initializeAsync — retrying after refresh")
+                        let refreshed = try await dependencies.authService.refresh()
+                        try? dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
+                        snapshot.accessToken = refreshed.accessToken
+                        snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
+                        subject.send(snapshot)
+                        let req = APIRequest(method: .get, path: "/api/user/me")
+                        let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
+                        snapshot.userId = me.id
+                        subject.send(snapshot)
+                        print("[EntityAuthSDK] initializeAsync — hydrated userId after refresh: \(me.id)")
+                    } catch {
+                        let desc = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
+                        print("[EntityAuthSDK] initializeAsync — refresh+hydrate failed: \(desc)")
+                    }
+                }
             }
         }
     }
