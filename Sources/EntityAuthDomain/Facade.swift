@@ -321,6 +321,17 @@ extension EntityAuthFacade {
     private func initializeAsync() async {
         await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
         setupRealtimeSubscriptions()
+        // Eagerly hydrate userId on cold start if tokens are present
+        if snapshot.userId == nil, dependencies.authState.currentTokens.accessToken != nil {
+            do {
+                let req = APIRequest(method: .get, path: "/api/user/me")
+                let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
+                snapshot.userId = me.id
+                subject.send(snapshot)
+            } catch {
+                // ignore; userId will be set on next successful auth flow
+            }
+        }
     }
     private func setupRealtimeSubscriptions() {
         realtimeCancellable = dependencies.realtime.publisher().sink { [weak self] event in
