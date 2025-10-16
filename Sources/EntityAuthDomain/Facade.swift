@@ -14,6 +14,11 @@ public protocol EntityAuthFacadeType: Sendable {
     func refreshTokens() async throws
     func organizations() async throws -> [OrganizationSummary]
     func activeOrganization() async throws -> ActiveOrganization?
+    // Passkeys
+    func beginPasskeyRegistration(userId: String, rpId: String, origins: [String]) async throws -> BeginRegistrationResponse
+    func finishPasskeyRegistration(challengeId: String, userId: String, attestation: PasskeyAttestation) async throws -> FinishRegistrationResponse
+    func beginPasskeyAuthentication(userId: String?, rpId: String, origins: [String]) async throws -> BeginAuthenticationResponse
+    func finishPasskeyAuthentication(challengeId: String, credentialId: String, newSignCount: Int?, userId: String?) async throws
 }
 
 public actor EntityAuthFacade {
@@ -234,6 +239,50 @@ public actor EntityAuthFacade {
         snapshot.accessToken = response.accessToken
         snapshot.refreshToken = response.refreshToken
         subject.send(snapshot)
+    }
+
+    // MARK: - Passkeys
+
+    public func beginPasskeyRegistration(userId: String, rpId: String, origins: [String]) async throws -> BeginRegistrationResponse {
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else { throw EntityAuthError.configurationMissingBaseURL }
+        return try await dependencies.authService.beginRegistration(workspaceTenantId: workspaceTenantId, userId: userId, rpId: rpId, origins: origins)
+    }
+
+    public func finishPasskeyRegistration(challengeId: String, userId: String, attestation: PasskeyAttestation) async throws -> FinishRegistrationResponse {
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else { throw EntityAuthError.configurationMissingBaseURL }
+        // Map PasskeyAttestation to WebAuthnRegistrationCredential is not applicable; server expects attestation fields in finishRegistration route.
+        // Use networking layer which already encodes expected payload shape.
+        let credential = WebAuthnRegistrationCredential(
+            id: attestation.credentialId,
+            rawId: attestation.credentialId,
+            response: .init(attestationObject: attestation.publicKeyCose, clientDataJSON: "")
+        )
+        return try await dependencies.authService.finishRegistration(workspaceTenantId: workspaceTenantId, challengeId: challengeId, userId: userId, credential: credential)
+    }
+
+    public func beginPasskeyAuthentication(userId: String?, rpId: String, origins: [String]) async throws -> BeginAuthenticationResponse {
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else { throw EntityAuthError.configurationMissingBaseURL }
+        return try await dependencies.authService.beginAuthentication(workspaceTenantId: workspaceTenantId, userId: userId, rpId: rpId, origins: origins)
+    }
+
+    public func finishPasskeyAuthentication(challengeId: String, credentialId: String, newSignCount: Int?, userId: String?) async throws {
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else { throw EntityAuthError.configurationMissingBaseURL }
+        let credential = WebAuthnAuthenticationCredential(
+            id: credentialId,
+            rawId: credentialId,
+            response: .init(authenticatorData: "", clientDataJSON: "", signature: "", userHandle: nil)
+        )
+        let response = try await dependencies.authService.finishAuthentication(workspaceTenantId: workspaceTenantId, challengeId: challengeId, credential: credential, userId: userId)
+        try dependencies.authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        snapshot.accessToken = response.accessToken
+        snapshot.refreshToken = response.refreshToken
+        snapshot.sessionId = response.sessionId
+        snapshot.userId = response.userId
+        subject.send(snapshot)
+        if let userId = snapshot.userId {
+            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        }
+        try await refreshUserData()
     }
 
     public func organizations() async throws -> [OrganizationSummary] {

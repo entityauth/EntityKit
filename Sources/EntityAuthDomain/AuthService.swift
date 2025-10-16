@@ -7,6 +7,11 @@ public protocol AuthProviding: Sendable {
     func login(request: LoginRequest) async throws -> LoginResponse
     func refresh() async throws -> RefreshResponse
     func logout(sessionId: String?, refreshToken: String?) async throws
+    // Passkeys
+    func beginRegistration(workspaceTenantId: String, userId: String, rpId: String, origins: [String]) async throws -> BeginRegistrationResponse
+    func finishRegistration(workspaceTenantId: String, challengeId: String, userId: String, credential: WebAuthnRegistrationCredential) async throws -> FinishRegistrationResponse
+    func beginAuthentication(workspaceTenantId: String, userId: String?, rpId: String, origins: [String]) async throws -> BeginAuthenticationResponse
+    func finishAuthentication(workspaceTenantId: String, challengeId: String, credential: WebAuthnAuthenticationCredential, userId: String?) async throws -> LoginResponse
 }
 
 public final class AuthService: AuthProviding, RefreshService {
@@ -50,5 +55,45 @@ public final class AuthService: AuthProviding, RefreshService {
         let body = try JSONSerialization.data(withJSONObject: payload.compactMapValues { $0 })
         let apiRequest = APIRequest(method: .post, path: "/api/auth/logout", headers: headers, body: body, requiresAuthentication: false)
         _ = try await client.send(apiRequest)
+    }
+
+    // MARK: - Passkeys
+
+    public func beginRegistration(workspaceTenantId: String, userId: String, rpId: String, origins: [String]) async throws -> BeginRegistrationResponse {
+        let payload: [String: Any] = [
+            "workspaceTenantId": workspaceTenantId,
+            "userId": userId,
+            "rpId": rpId,
+            "origins": origins
+        ]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let request = APIRequest(method: .post, path: "/api/auth/webauthn/begin/registration", headers: ["content-type": "application/json"], body: body, requiresAuthentication: false)
+        return try await client.send(request, decode: BeginRegistrationResponse.self)
+    }
+
+    public func finishRegistration(workspaceTenantId: String, challengeId: String, userId: String, credential: WebAuthnRegistrationCredential) async throws -> FinishRegistrationResponse {
+        struct Payload: Encodable { let workspaceTenantId: String; let challengeId: String; let userId: String; let credential: WebAuthnRegistrationCredential }
+        let body = try JSONEncoder().encode(Payload(workspaceTenantId: workspaceTenantId, challengeId: challengeId, userId: userId, credential: credential))
+        let request = APIRequest(method: .post, path: "/api/auth/webauthn/finish/registration", headers: ["content-type": "application/json"], body: body, requiresAuthentication: false)
+        return try await client.send(request, decode: FinishRegistrationResponse.self)
+    }
+
+    public func beginAuthentication(workspaceTenantId: String, userId: String?, rpId: String, origins: [String]) async throws -> BeginAuthenticationResponse {
+        var payload: [String: Any] = [
+            "workspaceTenantId": workspaceTenantId,
+            "rpId": rpId,
+            "origins": origins
+        ]
+        if let userId { payload["userId"] = userId }
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let request = APIRequest(method: .post, path: "/api/auth/webauthn/begin/authentication", headers: ["content-type": "application/json"], body: body, requiresAuthentication: false)
+        return try await client.send(request, decode: BeginAuthenticationResponse.self)
+    }
+
+    public func finishAuthentication(workspaceTenantId: String, challengeId: String, credential: WebAuthnAuthenticationCredential, userId: String?) async throws -> LoginResponse {
+        struct Payload: Encodable { let workspaceTenantId: String; let challengeId: String; let credential: WebAuthnAuthenticationCredential; let userId: String? }
+        let body = try JSONEncoder().encode(Payload(workspaceTenantId: workspaceTenantId, challengeId: challengeId, credential: credential, userId: userId))
+        let request = APIRequest(method: .post, path: "/api/auth/webauthn/finish/authentication", headers: ["content-type": "application/json"], body: body, requiresAuthentication: false)
+        return try await client.send(request, decode: LoginResponse.self)
     }
 }

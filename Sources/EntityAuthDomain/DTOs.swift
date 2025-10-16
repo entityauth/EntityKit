@@ -35,6 +35,112 @@ public struct RegisterResponse: Decodable, Sendable {
     public let success: Bool
 }
 
+// MARK: - Passkeys
+
+public struct BeginRegistrationResponse: Decodable, Sendable {
+    public struct Options: Decodable, Sendable {
+        public let challenge: String
+        public let rpId: String
+    }
+    public let challengeId: String
+    public let options: Options
+}
+
+public struct FinishRegistrationResponse: Decodable, Sendable {
+    public let ok: Bool
+    public let credentialEntityId: String?
+}
+
+public struct BeginAuthenticationResponse: Decodable, Sendable {
+    public struct Options: Decodable, Sendable {
+        public let challenge: String
+        public let rpId: String
+        public let allowCredentialIds: [String]?
+    }
+    public let challengeId: String
+    public let options: Options
+}
+
+// WebAuthn credential payloads for server routes
+public struct WebAuthnRegistrationCredential: Encodable, Sendable {
+    public struct Response: Encodable, Sendable {
+        public let attestationObject: String
+        public let clientDataJSON: String
+        public init(attestationObject: String, clientDataJSON: String) {
+            self.attestationObject = attestationObject
+            self.clientDataJSON = clientDataJSON
+        }
+    }
+    public let id: String
+    public let rawId: String
+    public let type: String
+    public let response: Response
+
+    public init(id: String, rawId: String, type: String = "public-key", response: Response) {
+        self.id = id
+        self.rawId = rawId
+        self.type = type
+        self.response = response
+    }
+}
+
+public struct WebAuthnAuthenticationCredential: Encodable, Sendable {
+    public struct Response: Encodable, Sendable {
+        public let authenticatorData: String
+        public let clientDataJSON: String
+        public let signature: String
+        public let userHandle: String?
+        public init(authenticatorData: String, clientDataJSON: String, signature: String, userHandle: String?) {
+            self.authenticatorData = authenticatorData
+            self.clientDataJSON = clientDataJSON
+            self.signature = signature
+            self.userHandle = userHandle
+        }
+    }
+    public let id: String
+    public let rawId: String
+    public let type: String
+    public let response: Response
+
+    public init(id: String, rawId: String, type: String = "public-key", response: Response) {
+        self.id = id
+        self.rawId = rawId
+        self.type = type
+        self.response = response
+    }
+}
+
+public struct PasskeyAttestation: Encodable, Sendable {
+    public let credentialId: String
+    public let publicKeyCose: String
+    public let signCount: Int?
+    public let transports: [String]?
+    public let aaguid: String?
+    public let backupEligible: Bool?
+    public let backupState: String?
+    public let attestationFmt: String?
+
+    public init(
+        credentialId: String,
+        publicKeyCose: String,
+        signCount: Int? = nil,
+        transports: [String]? = nil,
+        aaguid: String? = nil,
+        backupEligible: Bool? = nil,
+        backupState: String? = nil,
+        attestationFmt: String? = nil
+    ) {
+        self.credentialId = credentialId
+        self.publicKeyCose = publicKeyCose
+        self.signCount = signCount
+        self.transports = transports
+        self.aaguid = aaguid
+        self.backupEligible = backupEligible
+        self.backupState = backupState
+        self.attestationFmt = attestationFmt
+    }
+}
+
 public struct OrganizationSummaryDTO: Decodable, Sendable {
     public let orgId: String
     public let name: String?
