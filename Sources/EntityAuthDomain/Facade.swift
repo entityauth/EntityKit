@@ -325,6 +325,28 @@ public actor EntityAuthFacade {
         try await refreshUserData()
     }
 
+    /// Sign up with a passkey using email (creates new user account) and update the current session
+    public func signUpWithPasskey(email: String, rpId: String, origins: [String]) async throws {
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else {
+            print("[Facade] signUpWithPasskey: workspaceTenantId is nil!")
+            throw EntityAuthError.configurationMissingBaseURL
+        }
+        print("[Facade] signUpWithPasskey: workspaceTenantId=", workspaceTenantId, "email=", email)
+        let service = PasskeyAuthService(authService: dependencies.authService, workspaceTenantId: workspaceTenantId)
+        let response = try await service.signUp(email: email, rpId: rpId, origins: origins)
+        try dependencies.authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        snapshot.accessToken = response.accessToken
+        snapshot.refreshToken = response.refreshToken
+        snapshot.sessionId = response.sessionId
+        snapshot.userId = response.userId
+        lastUserStore.save(id: response.userId)
+        subject.send(snapshot)
+        if let userId = snapshot.userId {
+            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        }
+        try await refreshUserData()
+    }
+
     public func organizations() async throws -> [OrganizationSummary] {
         try await dependencies.organizationService.list().map { $0.asDomain }
     }

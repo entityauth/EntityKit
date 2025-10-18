@@ -6,6 +6,7 @@ import AuthenticationServices
 
 public protocol PasskeyAuthProviding: Sendable {
     func register(userId: String, rpId: String, origins: [String]) async throws -> FinishRegistrationResponse
+    func signUp(email: String, rpId: String, origins: [String]) async throws -> LoginResponse
     func signIn(userId: String?, rpId: String, origins: [String]) async throws -> LoginResponse
 }
 
@@ -53,6 +54,41 @@ extension PasskeyAuthService: PasskeyAuthProviding {
             workspaceTenantId: requiredWorkspace(),
             challengeId: begin.challengeId,
             userId: userId,
+            credential: credential
+        )
+        #else
+        throw EntityAuthError.configurationMissingBaseURL
+        #endif
+    }
+
+    public func signUp(email: String, rpId: String, origins: [String]) async throws -> LoginResponse {
+        #if canImport(AuthenticationServices)
+        let workspace = requiredWorkspace()
+        print("[PasskeyAuthService] signUp called with workspaceTenantId:", workspace, "email:", email)
+        let begin = try await authService.beginRegistrationWithEmail(workspaceTenantId: workspace, email: email, rpId: rpId, origins: origins)
+        let challenge = try decodeBase64url(begin.options.challenge)
+        let emailData = Data(email.utf8)
+
+        let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: begin.options.rpId)
+        let request = provider.createCredentialRegistrationRequest(challenge: challenge, name: email, userID: emailData)
+        request.attestationPreference = .none
+
+        let result = try await performAuthorization(requests: [request])
+        guard let reg = result.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration else {
+            throw EntityAuthError.invalidResponse
+        }
+        let credential = WebAuthnRegistrationCredential(
+            id: reg.credentialID.base64urlEncodedString(),
+            rawId: reg.credentialID.base64urlEncodedString(),
+            response: .init(
+                attestationObject: (reg.rawAttestationObject ?? Data()).base64urlEncodedString(),
+                clientDataJSON: (reg.rawClientDataJSON ?? Data()).base64urlEncodedString()
+            )
+        )
+        return try await authService.finishRegistrationWithEmail(
+            workspaceTenantId: requiredWorkspace(),
+            challengeId: begin.challengeId,
+            email: email,
             credential: credential
         )
         #else

@@ -64,6 +64,14 @@ public final class APIClient: APIClientType, @unchecked Sendable {
 
     private func perform(request: APIRequest, retryingOn401: Bool) async throws -> Data {
         let urlRequest = try makeURLRequest(for: request)
+        if request.path.contains("webauthn") {
+            print("[APIClient] Request URL:", urlRequest.url?.absoluteString ?? "nil")
+            print("[APIClient] Request Method:", urlRequest.httpMethod ?? "nil")
+            print("[APIClient] Request Headers:", urlRequest.allHTTPHeaderFields ?? [:])
+            if let body = urlRequest.httpBody, let bodyStr = String(data: body, encoding: .utf8) {
+                print("[APIClient] Request Body:", bodyStr)
+            }
+        }
         do {
             let (data, response) = try await urlSession.data(for: urlRequest)
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -103,19 +111,22 @@ public final class APIClient: APIClientType, @unchecked Sendable {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
-        let bearerHeader = request.requiresAuthentication ? bearerAuthHeader() : ["content-type": "application/json"]
-        for (key, value) in bearerHeader.merging(request.headers, uniquingKeysWith: { _, rhs in rhs }) {
+        
+        // Build headers: always include client headers, add auth if required
+        var headers = clientHeaders()
+        if request.requiresAuthentication, let accessToken = authState.currentTokens.accessToken {
+            headers["authorization"] = "Bearer \(accessToken)"
+        }
+        
+        // Merge with request-specific headers (request headers take precedence)
+        for (key, value) in headers.merging(request.headers, uniquingKeysWith: { _, rhs in rhs }) {
             urlRequest.addValue(value, forHTTPHeaderField: key)
         }
         return urlRequest
     }
 
-    private func bearerAuthHeader() -> [String: String] {
-        let accessToken = authState.currentTokens.accessToken
+    private func clientHeaders() -> [String: String] {
         var header = ["content-type": "application/json"]
-        if let accessToken {
-            header["authorization"] = "Bearer \(accessToken)"
-        }
         header["x-client"] = config.clientIdentifier
         if let workspaceTenantId = config.workspaceTenantId {
             header["x-workspace-tenant-id"] = workspaceTenantId
