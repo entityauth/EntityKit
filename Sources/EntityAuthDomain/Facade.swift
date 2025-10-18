@@ -285,6 +285,46 @@ public actor EntityAuthFacade {
         try await refreshUserData()
     }
 
+    // MARK: - Convenience helpers for SSO/Passkeys
+
+    /// Apply externally obtained tokens (e.g., from SSO exchange) and hydrate state
+    public func applyTokens(accessToken: String, refreshToken: String?, sessionId: String?, userId: String?) async throws {
+        try dependencies.authState.update(accessToken: accessToken, refreshToken: refreshToken)
+        snapshot.accessToken = accessToken
+        snapshot.refreshToken = refreshToken ?? snapshot.refreshToken
+        snapshot.sessionId = sessionId
+        snapshot.userId = userId
+        subject.send(snapshot)
+        if let userId = snapshot.userId {
+            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        }
+        try await refreshUserData()
+    }
+
+    /// Register a passkey using native platform APIs and server WebAuthn endpoints
+    public func registerPasskey(userId: String, rpId: String, origins: [String]) async throws -> FinishRegistrationResponse {
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else { throw EntityAuthError.configurationMissingBaseURL }
+        let service = PasskeyAuthService(authService: dependencies.authService, workspaceTenantId: workspaceTenantId)
+        return try await service.register(userId: userId, rpId: rpId, origins: origins)
+    }
+
+    /// Sign in with a passkey and update the current session
+    public func signInWithPasskey(userId: String?, rpId: String, origins: [String]) async throws {
+        guard let workspaceTenantId = dependencies.apiClient.workspaceTenantId else { throw EntityAuthError.configurationMissingBaseURL }
+        let service = PasskeyAuthService(authService: dependencies.authService, workspaceTenantId: workspaceTenantId)
+        let response = try await service.signIn(userId: userId, rpId: rpId, origins: origins)
+        try dependencies.authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        snapshot.accessToken = response.accessToken
+        snapshot.refreshToken = response.refreshToken
+        snapshot.sessionId = response.sessionId
+        snapshot.userId = response.userId
+        subject.send(snapshot)
+        if let userId = snapshot.userId {
+            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        }
+        try await refreshUserData()
+    }
+
     public func organizations() async throws -> [OrganizationSummary] {
         try await dependencies.organizationService.list().map { $0.asDomain }
     }
