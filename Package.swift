@@ -8,7 +8,8 @@ let package = Package(
         .macOS(.v26)
     ],
     products: [
-        .library(name: "EntityKit", targets: ["EntityKit"])
+        .library(name: "EntityKit", targets: ["EntityKit"]),
+        .library(name: "EntityAuthUI", targets: ["EntityAuthUI"])
     ],
     dependencies: [
         .package(url: "https://github.com/entityauth/convex-swift.git", from: "0.1.0")
@@ -39,6 +40,15 @@ let package = Package(
         ),
         .target(
             name: "EntityKit",
+            dependencies: [
+                "EntityAuthCore",
+                "EntityAuthNetworking",
+                "EntityAuthDomain",
+                "EntityAuthRealtime"
+            ]
+        ),
+        .target(
+            name: "EntityAuthUI",
             dependencies: [
                 "EntityAuthCore",
                 "EntityAuthNetworking",
