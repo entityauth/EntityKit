@@ -2,11 +2,11 @@ import Foundation
 
 public enum ComponentKind: String, CaseIterable, Sendable {
     case authView = "auth-view"
-    case userButton = "user-button"
-    case userProfileView = "user-profile-view"
+    case userProfile = "user-profile"
+    case userDisplay = "user-display"
 }
 
-public struct ComponentItem: Identifiable, Sendable, Equatable {
+public struct ComponentItem: Identifiable, Sendable, Equatable, Hashable {
     public var id: String { slug.joined(separator: "/") }
     public var title: String
     public var slug: [String]
@@ -26,20 +26,20 @@ public let componentRegistry: [ComponentItem] = [
         component: .authView
     ),
     .init(
-        title: "User Button",
-        slug: ["user", "button"],
-        description: "Avatar button opening profile",
-        keywords: ["user", "profile"],
-        group: "Core",
-        component: .userButton
-    ),
-    .init(
         title: "User Profile",
         slug: ["user", "profile"],
-        description: "Account management surface",
-        keywords: ["user", "account"],
+        description: "Profile access button and surface",
+        keywords: ["user", "profile"],
         group: "Core",
-        component: .userProfileView
+        component: .userProfile
+    ),
+    .init(
+        title: "User Display",
+        slug: ["user", "display"],
+        description: "Compact identity display",
+        keywords: ["user", "identity"],
+        group: "Core",
+        component: .userDisplay
     )
 ]
 

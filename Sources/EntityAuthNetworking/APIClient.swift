@@ -64,13 +64,8 @@ public final class APIClient: APIClientType, @unchecked Sendable {
 
     private func perform(request: APIRequest, retryingOn401: Bool) async throws -> Data {
         let urlRequest = try makeURLRequest(for: request)
-        if request.path.contains("webauthn") {
-            print("[APIClient] Request URL:", urlRequest.url?.absoluteString ?? "nil")
-            print("[APIClient] Request Method:", urlRequest.httpMethod ?? "nil")
-            print("[APIClient] Request Headers:", urlRequest.allHTTPHeaderFields ?? [:])
-            if let body = urlRequest.httpBody, let bodyStr = String(data: body, encoding: .utf8) {
-                print("[APIClient] Request Body:", bodyStr)
-            }
+        if EntityAuthDebugLog.enabled {
+            print("[APIClient]", urlRequest.httpMethod ?? "", urlRequest.url?.absoluteString ?? "")
         }
         do {
             let (data, response) = try await urlSession.data(for: urlRequest)
@@ -79,6 +74,7 @@ public final class APIClient: APIClientType, @unchecked Sendable {
             }
             switch httpResponse.statusCode {
             case 200..<300:
+                if EntityAuthDebugLog.enabled { print("[APIClient] ←", httpResponse.statusCode, (urlRequest.url?.path ?? "")) }
                 return data
             case 401:
                 if retryingOn401 {
@@ -95,6 +91,7 @@ public final class APIClient: APIClientType, @unchecked Sendable {
         } catch let error as EntityAuthError {
             throw error
         } catch {
+            if EntityAuthDebugLog.enabled { print("[APIClient] error:", error.localizedDescription) }
             throw EntityAuthError.transport(error)
         }
     }

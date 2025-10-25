@@ -4,7 +4,7 @@ public struct AuthView: View {
     @StateObject private var viewModel: AuthViewModel
     @Environment(\.entityTheme) private var theme
 
-    public init(viewModel: AuthViewModel) {
+    public init(viewModel: AuthViewModel = AuthViewModel()) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
 

@@ -1,9 +1,9 @@
 import SwiftUI
-import EntityAuthDomain
 
 public struct SandboxRootView: View {
     @State private var query: String = ""
     @State private var selection: ComponentItem? = componentRegistry.first
+    @Environment(\.entityAuthProvider) private var provider
 
     public init() {}
 
@@ -14,17 +14,12 @@ public struct SandboxRootView: View {
                     Text(item.title).font(.headline)
                     Text(item.description).font(.subheadline).foregroundStyle(.secondary)
                 }
+                .tag(item)
             }
             .navigationTitle("UI Components")
             .searchable(text: $query, placement: .sidebar)
         } detail: {
-            if let item = selection {
-                ScrollView { Preview(item: item) }
-                    .padding()
-                    .navigationTitle(item.title)
-            } else {
-                ContentUnavailableView("Select a component", systemImage: "square.grid.2x2")
-            }
+            AuthOrContent(selection: selection)
         }
     }
 
@@ -39,20 +34,52 @@ public struct SandboxRootView: View {
     }
 }
 
+private struct AuthOrContent: View {
+    let selection: ComponentItem?
+    @Environment(\.entityAuthProvider) private var provider
+    @State private var isAuthenticated: Bool = false
+
+    var body: some View {
+        Group {
+            if isAuthenticated {
+                if let item = selection {
+                    ScrollView { Preview(item: item) }
+                        .padding()
+                        .navigationTitle(item.title)
+                } else {
+                    ContentUnavailableView("Select a component", systemImage: "square.grid.2x2")
+                }
+            } else {
+                AuthGate()
+            }
+        }
+        .task {
+            // Consider authenticated if we ever get a snapshot with a userId
+            let stream = await provider.snapshotStream()
+            for await snap in stream {
+                if snap.userId != nil {
+                    isAuthenticated = true
+                    break
+                }
+            }
+        }
+    }
+}
+
 private struct Preview: View {
     let item: ComponentItem
 
     var body: some View {
         switch item.component {
         case .authView:
-            AuthView(viewModel: .init(authService: AuthService()))
-        case .userButton:
+            AuthView()
+        case .userProfile:
             VStack(spacing: 12) {
                 Text("Toolbar-style preview").font(.caption).foregroundStyle(.secondary)
-                UserButton()
+                UserProfile()
             }
-        case .userProfileView:
-            UserProfileView(viewModel: .init(facade: Facade()))
+        case .userDisplay:
+            UserDisplay()
         }
     }
 }

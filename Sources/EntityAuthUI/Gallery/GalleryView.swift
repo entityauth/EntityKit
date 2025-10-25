@@ -37,13 +37,13 @@ private struct Preview: View {
     var body: some View {
         switch item.component {
         case .authView:
-            AuthView(viewModel: .init(authService: AuthService()))
+            AuthView()
                 .padding(.vertical, 8)
-        case .userButton:
-            UserButton()
+        case .userProfile:
+            UserProfile()
                 .padding(.vertical, 8)
-        case .userProfileView:
-            UserProfileView(viewModel: .init(facade: Facade()))
+        case .userDisplay:
+            UserDisplay()
                 .padding(.vertical, 8)
         }
     }
