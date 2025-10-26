@@ -20,14 +20,20 @@ public struct LoginResponse: Decodable, Sendable {
 }
 
 public struct RegisterRequest: Encodable, Sendable {
+    public enum WorkspaceRole: String, Encodable, Sendable {
+        case owner
+        case member
+    }
     public let email: String
     public let password: String
     public let workspaceTenantId: String
+    public let defaultWorkspaceRole: WorkspaceRole?
 
-    public init(email: String, password: String, workspaceTenantId: String) {
+    public init(email: String, password: String, workspaceTenantId: String, defaultWorkspaceRole: WorkspaceRole? = nil) {
         self.email = email
         self.password = password
         self.workspaceTenantId = workspaceTenantId
+        self.defaultWorkspaceRole = defaultWorkspaceRole
     }
 }
 
