@@ -228,6 +228,16 @@ public actor EntityAuthFacade {
         lastUserStore.clear()
     }
 
+    /// Hard reset local auth state without contacting the server.
+    /// Useful in development to clear Keychain tokens and local snapshot if state becomes inconsistent.
+    public func hardResetLocalAuth() async {
+        try? authState.clear()
+        snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
+        subject.send(snapshot)
+        await dependencies.realtime.stop()
+        lastUserStore.clear()
+    }
+
     public func refreshTokens() async throws {
         let response = try await dependencies.authService.refresh()
         try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
@@ -252,6 +262,106 @@ public actor EntityAuthFacade {
             await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
         }
         try await refreshUserData()
+    }
+
+    // MARK: - Post-SSO Bootstrap (parity with Web)
+
+    public struct SSOBootstrapOptions: Sendable {
+        public var createEAOrgIfMissing: Bool
+        public var defaultOrgName: String?
+        public init(createEAOrgIfMissing: Bool = true, defaultOrgName: String? = nil) {
+            self.createEAOrgIfMissing = createEAOrgIfMissing
+            self.defaultOrgName = defaultOrgName
+        }
+    }
+
+    /// Mirrors web's SSOBootstrap: ensures EA has an organization and invokes Convex ensureUser/ensureOrganization.
+    /// - Parameters:
+    ///   - options: Controls EA org auto-creation behavior and naming.
+    ///   - ensureUser: Closure that must invoke the backend action to ensure a Convex user exists.
+    ///   - ensureOrganization: Closure that must invoke the backend action to ensure a Convex org exists, optionally using the EA org id.
+    public func bootstrapAfterSSO(
+        options: SSOBootstrapOptions = SSOBootstrapOptions(),
+        ensureUser: @escaping @Sendable () async throws -> Void,
+        ensureOrganization: @escaping @Sendable (_ eaOrgId: String?) async throws -> Void
+    ) async throws {
+        print("[EntityAuth][Bootstrap] begin")
+        // Step 1: Make sure we have fresh tokens and a hydrated snapshot
+        do {
+            try await refreshTokens()
+            print("[EntityAuth][Bootstrap] refreshTokens ✓ access=\(snapshot.accessToken != nil) refresh=\(snapshot.refreshToken != nil)")
+        } catch {
+            // Proceed even if refresh fails; snapshot may already have valid tokens
+            print("[EntityAuth][Bootstrap] refreshTokens error: \(error)")
+        }
+
+        // Ensure we know current user id for EA operations
+        if snapshot.userId == nil {
+            do {
+                let req = APIRequest(method: .get, path: "/api/user/me")
+                let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
+                snapshot.userId = me.id
+                subject.send(snapshot)
+                print("[EntityAuth][Bootstrap] resolved userId=\(me.id)")
+            } catch {
+                // If we cannot resolve user id, we cannot create EA org with an actorId
+                print("[EntityAuth][Bootstrap] failed to resolve userId: \(error)")
+            }
+        }
+
+        // Step 2: Ensure EA organization exists (optional)
+        var eaOrgId: String? = nil
+        do {
+            let orgs = try await organizations()
+            print("[EntityAuth][Bootstrap] orgs count=\(orgs.count)")
+            if let existing = orgs.first { // Pick first membership as active org
+                eaOrgId = existing.orgId
+            } else if options.createEAOrgIfMissing {
+                // Create a default org in EA so Convex can bind to it
+                if let wid = dependencies.apiClient.workspaceTenantId, let ownerId = snapshot.userId {
+                    let name: String = options.defaultOrgName ?? (snapshot.username.map { "\($0)'s Organization" } ?? "Organization")
+                    let slug: String = normalizeUsername(name)
+                    do {
+                        let created = try await dependencies.entitiesService.createEnforced(
+                            workspaceTenantId: wid,
+                            kind: "org",
+                            properties: [
+                                "name": name,
+                                "slug": slug
+                            ],
+                            metadata: nil,
+                            actorId: ownerId
+                        )
+                        eaOrgId = created.id
+                        print("[EntityAuth][Bootstrap] created EA org id=\(created.id)")
+                    } catch {
+                        // Fall back to OrganizationService (no id returned)
+                        print("[EntityAuth][Bootstrap] createEnforced failed: \(error); falling back")
+                        try? await dependencies.organizationService.create(
+                            workspaceTenantId: wid,
+                            name: name,
+                            slug: slug,
+                            ownerId: ownerId
+                        )
+                        // Best-effort fetch memberships again to resolve id
+                        if let refreshed = try? await organizations().first?.orgId {
+                            eaOrgId = refreshed
+                            print("[EntityAuth][Bootstrap] resolved EA org via list id=\(refreshed)")
+                        }
+                    }
+                }
+            }
+        } catch {
+            // If listing organizations fails, continue; Convex ensure may still create membership
+            print("[EntityAuth][Bootstrap] organizations() failed: \(error)")
+        }
+
+        // Step 3: Ensure Convex user and organization
+        print("[EntityAuth][Bootstrap] ensuring user in Convex...")
+        try await ensureUser()
+        print("[EntityAuth][Bootstrap] ensuring organization in Convex with eaOrgId=\(eaOrgId ?? "<none>")...")
+        try await ensureOrganization(eaOrgId)
+        print("[EntityAuth][Bootstrap] complete")
     }
 
     /// Register a passkey using native platform APIs and server WebAuthn endpoints
