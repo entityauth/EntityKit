@@ -44,7 +44,9 @@ let package = Package(
                 "EntityAuthCore",
                 "EntityAuthNetworking",
                 "EntityAuthDomain",
-                "EntityAuthRealtime"
+                "EntityAuthRealtime",
+                // Re-export UI so consumers can just `import EntityKit`
+                "EntityAuthUI"
             ]
         ),
         .target(

@@ -72,12 +72,14 @@ public final class APIClient: APIClientType, @unchecked Sendable {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw EntityAuthError.invalidResponse
             }
+            let isRefreshEndpoint = request.path == "/api/auth/refresh"
             switch httpResponse.statusCode {
             case 200..<300:
                 if EntityAuthDebugLog.enabled { print("[APIClient] ←", httpResponse.statusCode, (urlRequest.url?.path ?? "")) }
                 return data
             case 401:
-                if retryingOn401 {
+                // Do not attempt a refresh-loop if the 401 came from the refresh endpoint itself
+                if retryingOn401 && !isRefreshEndpoint {
                     return try await refreshHandler.retryAfterRefreshing { [weak self] in
                         guard let self else { throw EntityAuthError.refreshFailed }
                         return try await self.perform(request: request, retryingOn401: false)

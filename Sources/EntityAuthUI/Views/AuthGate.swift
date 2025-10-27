@@ -1,5 +1,6 @@
 import SwiftUI
 import EntityAuthDomain
+import EntityAuthCore
 
 public struct AuthGate: View {
     @Environment(\.entityAuthProvider) private var provider
@@ -31,15 +32,18 @@ public struct AuthGate: View {
         let base = provider.baseURL()
         let sso = EntityAuthSSO(baseURL: base)
         #if os(iOS)
-        let callback = URL(string: "entityauth-demo://sso")!
+        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth-demo://sso")!
         #else
-        let callback = URL(string: "entityauth-demo-mac://sso")!
+        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth-demo-mac://sso")!
         #endif
         do {
+            EntityAuthDebugLog.log("[AuthGate] signInSSO begin tenant=\(tenant) base=\(base.absoluteString) callback=\(callback.absoluteString)")
             let result = try await sso.signIn(provider: "google", returnTo: callback, workspaceTenantId: tenant)
             try await provider.applyTokens(access: result.accessToken, refresh: result.refreshToken, sessionId: result.sessionId, userId: result.userId)
+            EntityAuthDebugLog.log("[AuthGate] signInSSO success userId=\(result.userId)")
             errorText = nil
         } catch {
+            EntityAuthDebugLog.log("[AuthGate] signInSSO error:", error.localizedDescription)
             errorText = error.localizedDescription
         }
     }

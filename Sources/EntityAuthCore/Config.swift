@@ -23,19 +23,22 @@ public struct EntityAuthConfig: Sendable, Equatable {
     public var workspaceTenantId: String?
     public var clientIdentifier: String
     public var userDefaultsSuiteName: String?
+    public var ssoCallbackURL: URL?
 
     public init(
         environment: EntityAuthEnvironment = .production,
         baseURL: URL? = nil,
         workspaceTenantId: String? = nil,
         clientIdentifier: String = "native",
-        userDefaultsSuiteName: String? = nil
+        userDefaultsSuiteName: String? = nil,
+        ssoCallbackURL: URL? = nil
     ) {
         self.environment = environment
         self.baseURL = baseURL ?? environment.defaultBaseURL
         self.workspaceTenantId = workspaceTenantId
         self.clientIdentifier = clientIdentifier
         self.userDefaultsSuiteName = userDefaultsSuiteName
+        self.ssoCallbackURL = ssoCallbackURL
     }
 }
 

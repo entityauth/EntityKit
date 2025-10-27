@@ -12,6 +12,7 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _orgs: @Sendable () async throws -> Organizations
     private let _baseURL: @Sendable () -> URL
     private let _tenantId: @Sendable () -> String?
+    private let _ssoCallbackURL: @Sendable () -> URL?
     private let _applyTokens: @Sendable (_ access: String, _ refresh: String?, _ sessionId: String?, _ userId: String?) async throws -> Void
 
     public init(
@@ -20,6 +21,7 @@ public struct AnyEntityAuthProvider: Sendable {
         organizations: @escaping @Sendable () async throws -> Organizations,
         baseURL: @escaping @Sendable () -> URL,
         tenantId: @escaping @Sendable () -> String?,
+        ssoCallbackURL: @escaping @Sendable () -> URL?,
         applyTokens: @escaping @Sendable (_ access: String, _ refresh: String?, _ sessionId: String?, _ userId: String?) async throws -> Void
     ) {
         self._stream = stream
@@ -27,6 +29,7 @@ public struct AnyEntityAuthProvider: Sendable {
         self._orgs = organizations
         self._baseURL = baseURL
         self._tenantId = tenantId
+        self._ssoCallbackURL = ssoCallbackURL
         self._applyTokens = applyTokens
     }
 
@@ -35,6 +38,7 @@ public struct AnyEntityAuthProvider: Sendable {
     public func organizations() async throws -> Organizations { try await _orgs() }
     public func baseURL() -> URL { _baseURL() }
     public func workspaceTenantId() -> String? { _tenantId() }
+    public func ssoCallbackURL() -> URL? { _ssoCallbackURL() }
     public func applyTokens(access: String, refresh: String?, sessionId: String?, userId: String?) async throws { try await _applyTokens(access, refresh, sessionId, userId) }
 }
 
@@ -46,6 +50,7 @@ public extension AnyEntityAuthProvider {
             organizations: { try await facade.organizations() },
             baseURL: { config.baseURL },
             tenantId: { config.workspaceTenantId },
+            ssoCallbackURL: { config.ssoCallbackURL },
             applyTokens: { access, refresh, sessionId, userId in
                 try await facade.applyTokens(accessToken: access, refreshToken: refresh, sessionId: sessionId, userId: userId)
             }
@@ -71,6 +76,7 @@ public extension AnyEntityAuthProvider {
             organizations: { [] },
             baseURL: { URL(string: "https://example.com")! },
             tenantId: { nil },
+            ssoCallbackURL: { nil },
             applyTokens: { _, _, _, _ in }
         )
     }
