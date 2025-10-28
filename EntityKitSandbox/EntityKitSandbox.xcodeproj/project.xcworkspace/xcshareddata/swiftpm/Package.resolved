@@ -1,0 +1,15 @@
+{
+  "originHash" : "fcbb60d2d2d012803ca4950c2617e39429e32767f1be259266517804e9a291a3",
+  "pins" : [
+    {
+      "identity" : "convex-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/entityauth/convex-swift.git",
+      "state" : {
+        "revision" : "ed37bfa5bd8f8982a2e6490ddf7bf0f4878e4d24",
+        "version" : "0.1.2"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -181,7 +181,7 @@
 			mainGroup = B8C7AD952EA5F4C10079C5D9;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference "../../EntityKit" */,
+				B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference ".." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B8C7AD9F2EA5F4C10079C5D9 /* Products */;
@@ -364,8 +364,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = DA7B5U47PT;
-				ENABLE_APP_SANDBOX = NO;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -401,8 +402,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = DA7B5U47PT;
-				ENABLE_APP_SANDBOX = NO;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -531,29 +533,31 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference "../../EntityKit" */ = {
+		B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference ".." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../EntityKit;
+			relativePath = ..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		B8C7ADBF2EA5F7370079C5D9 /* EntityKit */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference ".." */;
 			productName = EntityKit;
 		};
 		B8C7ADC22EA5F74B0079C5D9 /* EntityKit */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference ".." */;
 			productName = EntityKit;
 		};
 		B8C7ADC52EA5FAEF0079C5D9 /* EntityAuthUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference "../../EntityKit" */;
+			package = B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference ".." */;
 			productName = EntityAuthUI;
 		};
 		B8C7ADC72EA5FAFA0079C5D9 /* EntityAuthUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference "../../EntityKit" */;
+			package = B8C7ADC12EA5F74B0079C5D9 /* XCLocalSwiftPackageReference ".." */;
 			productName = EntityAuthUI;
 		};
 /* End XCSwiftPackageProductDependency section */

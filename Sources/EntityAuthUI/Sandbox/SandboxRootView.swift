@@ -68,11 +68,28 @@ private struct AuthOrContent: View {
 
 private struct Preview: View {
     let item: ComponentItem
+    @State private var email: String = ""
+    @State private var password: String = ""
+    @State private var errorText: String?
 
     var body: some View {
         switch item.component {
         case .authView:
-            AuthView()
+            AuthView(
+                email: $email,
+                password: $password,
+                errorText: $errorText,
+                onSSOSignIn: {
+                    // Mock SSO callback for preview
+                    print("[Preview] SSO sign-in tapped")
+                    errorText = "Preview mode - SSO not implemented"
+                },
+                onEmailSignIn: { email, password in
+                    // Mock email sign-in callback for preview
+                    print("[Preview] Email sign-in tapped: \(email)")
+                    errorText = "Preview mode - Email sign-in not implemented"
+                }
+            )
         case .userProfile:
             VStack(spacing: 12) {
                 Text("Toolbar-style preview").font(.caption).foregroundStyle(.secondary)

@@ -1,5 +1,4 @@
 import SwiftUI
-import EntityAuthDomain
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
@@ -182,8 +181,8 @@ private struct UserProfileSheet: View {
             case .account:
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Account").font(.title3).bold()
-                    Button("Sign in with SSO") { Task { await signInSSO() } }
-                        .buttonStyle(.borderedProminent)
+                    Text("Your account information and settings.")
+                        .foregroundStyle(.secondary)
                 }
             case .security:
                 SectionDetail(section: .security)
@@ -258,26 +257,6 @@ private struct SectionDetail: View {
         case .security: return "Passwords, passkeys, and MFA settings."
         case .organizations: return "Switch organizations and manage roles."
         case .preferences: return "Appearance and component options."
-        }
-    }
-}
-
-// MARK: - SSO helpers
-extension UserProfileSheet {
-    fileprivate func signInSSO() async {
-        guard let tenant = provider.workspaceTenantId() else { return }
-        let base = provider.baseURL()
-        let sso = EntityAuthSSO(baseURL: base)
-        #if os(iOS)
-        let callback = URL(string: "entityauth-demo://sso")!
-        #else
-        let callback = URL(string: "entityauth-demo-mac://sso")!
-        #endif
-        do {
-            let result = try await sso.signIn(provider: "google", returnTo: callback, workspaceTenantId: tenant)
-            try await provider.applyTokens(access: result.accessToken, refresh: result.refreshToken, sessionId: result.sessionId, userId: result.userId)
-        } catch {
-            print("[SSO] sign-in failed:", error.localizedDescription)
         }
     }
 }
