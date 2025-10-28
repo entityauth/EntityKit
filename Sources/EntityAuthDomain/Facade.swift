@@ -247,6 +247,48 @@ public actor EntityAuthFacade {
     }
 
     // MARK: - Passkeys
+    
+    /// Sign in with passkey
+    public func passkeySignIn(rpId: String, origins: [String]) async throws -> LoginResponse {
+        let passkeyService = PasskeyAuthService(
+            authService: dependencies.authService,
+            workspaceTenantId: dependencies.config.workspaceTenantId
+        )
+        let response = try await passkeyService.signIn(userId: nil, rpId: rpId, origins: origins)
+        try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        snapshot.accessToken = response.accessToken
+        snapshot.refreshToken = response.refreshToken
+        snapshot.sessionId = response.sessionId
+        snapshot.userId = response.userId
+        lastUserStore.save(id: response.userId)
+        subject.send(snapshot)
+        if let userId = snapshot.userId {
+            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        }
+        try await refreshUserData()
+        return response
+    }
+    
+    /// Sign up with passkey
+    public func passkeySignUp(email: String, rpId: String, origins: [String]) async throws -> LoginResponse {
+        let passkeyService = PasskeyAuthService(
+            authService: dependencies.authService,
+            workspaceTenantId: dependencies.config.workspaceTenantId
+        )
+        let response = try await passkeyService.signUp(email: email, rpId: rpId, origins: origins)
+        try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+        snapshot.accessToken = response.accessToken
+        snapshot.refreshToken = response.refreshToken
+        snapshot.sessionId = response.sessionId
+        snapshot.userId = response.userId
+        lastUserStore.save(id: response.userId)
+        subject.send(snapshot)
+        if let userId = snapshot.userId {
+            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        }
+        try await refreshUserData()
+        return response
+    }
 
     // MARK: - Convenience helpers for SSO/Passkeys
 

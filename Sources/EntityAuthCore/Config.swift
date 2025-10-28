@@ -24,6 +24,8 @@ public struct EntityAuthConfig: Sendable, Equatable {
     public var clientIdentifier: String
     public var userDefaultsSuiteName: String?
     public var ssoCallbackURL: URL?
+    public var rpId: String?
+    public var origins: [String]?
 
     public init(
         environment: EntityAuthEnvironment = .production,
@@ -31,7 +33,9 @@ public struct EntityAuthConfig: Sendable, Equatable {
         workspaceTenantId: String? = nil,
         clientIdentifier: String = "native",
         userDefaultsSuiteName: String? = nil,
-        ssoCallbackURL: URL? = nil
+        ssoCallbackURL: URL? = nil,
+        rpId: String? = nil,
+        origins: [String]? = nil
     ) {
         self.environment = environment
         self.baseURL = baseURL ?? environment.defaultBaseURL
@@ -39,6 +43,8 @@ public struct EntityAuthConfig: Sendable, Equatable {
         self.clientIdentifier = clientIdentifier
         self.userDefaultsSuiteName = userDefaultsSuiteName
         self.ssoCallbackURL = ssoCallbackURL
+        self.rpId = rpId
+        self.origins = origins
     }
 }
 

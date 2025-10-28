@@ -79,15 +79,35 @@ private struct Preview: View {
                 email: $email,
                 password: $password,
                 errorText: $errorText,
-                onSSOSignIn: {
-                    // Mock SSO callback for preview
-                    print("[Preview] SSO sign-in tapped")
-                    errorText = "Preview mode - SSO not implemented"
+                onGoogleSignIn: {
+                    // Mock Google SSO callback for preview
+                    print("[Preview] Google SSO sign-in tapped")
+                    errorText = "Preview mode - Google SSO not implemented"
+                },
+                onGitHubSignIn: {
+                    // Mock GitHub SSO callback for preview
+                    print("[Preview] GitHub SSO sign-in tapped")
+                    errorText = "Preview mode - GitHub SSO not implemented"
+                },
+                onPasskeySignIn: {
+                    // Mock Passkey sign-in callback for preview
+                    print("[Preview] Passkey sign-in tapped")
+                    errorText = "Preview mode - Passkey sign-in not implemented"
+                },
+                onPasskeySignUp: { email in
+                    // Mock Passkey sign-up callback for preview
+                    print("[Preview] Passkey sign-up tapped: \(email)")
+                    errorText = "Preview mode - Passkey sign-up not implemented"
                 },
                 onEmailSignIn: { email, password in
                     // Mock email sign-in callback for preview
                     print("[Preview] Email sign-in tapped: \(email)")
                     errorText = "Preview mode - Email sign-in not implemented"
+                },
+                onEmailRegister: { email, password in
+                    // Mock email registration callback for preview
+                    print("[Preview] Email registration tapped: \(email)")
+                    errorText = "Preview mode - Email registration not implemented"
                 }
             )
         case .userProfile:
