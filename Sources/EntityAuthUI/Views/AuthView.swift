@@ -80,7 +80,7 @@ public struct AuthView: View {
                     .frame(maxWidth: 448)
                     
                     // Card - Contains Tab Picker and Forms
-                    VStack(spacing: 12) {
+                    VStack(spacing: 0) {
                         // Tab Picker
                         Picker("", selection: $selectedTab) {
                             Text("Sign in").tag(AuthTab.signIn)
@@ -130,26 +130,45 @@ public struct AuthView: View {
     // MARK: - Sign In View
     
     private var signInView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
+            Spacer()
+                .frame(height: 8)
+            
+            VStack(spacing: 12) {
             // Email/Password Form
             #if os(iOS)
             TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                )
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
                 .disabled(isLoading)
-                .clipShape(.capsule)
             #else
             TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                )
                 .disabled(isLoading)
-                .clipShape(.capsule)
             #endif
             
             SecureField("Password", text: $password)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                )
                 .disabled(isLoading)
-                .clipShape(.capsule)
             
             Button(action: {
                 Task {
@@ -161,9 +180,11 @@ public struct AuthView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 } else {
                     Text("Sign in")
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -183,9 +204,9 @@ public struct AuthView: View {
                     Image("Google")
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.bordered)
                 .clipShape(.capsule)
@@ -201,9 +222,9 @@ public struct AuthView: View {
                     Image("GithubLight")
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.bordered)
                 .clipShape(.capsule)
@@ -219,13 +240,14 @@ public struct AuthView: View {
                     Image("PasskeyLight")
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.bordered)
                 .clipShape(.capsule)
                 .disabled(isLoading)
+            }
             }
         }
     }
@@ -233,26 +255,45 @@ public struct AuthView: View {
     // MARK: - Register View
     
     private var registerView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
+            Spacer()
+                .frame(height: 8)
+            
+            VStack(spacing: 12) {
             // Email/Password Form
             #if os(iOS)
             TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                )
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
                 .disabled(isLoading)
-                .clipShape(.capsule)
             #else
             TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                )
                 .disabled(isLoading)
-                .clipShape(.capsule)
             #endif
             
             SecureField("Password", text: $password)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                )
                 .disabled(isLoading)
-                .clipShape(.capsule)
             
             Button(action: {
                 Task {
@@ -264,9 +305,11 @@ public struct AuthView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 } else {
                     Text("Create account")
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -286,9 +329,9 @@ public struct AuthView: View {
                     Image("Google")
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.bordered)
                 .clipShape(.capsule)
@@ -304,9 +347,9 @@ public struct AuthView: View {
                     Image("GithubLight")
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.bordered)
                 .clipShape(.capsule)
@@ -318,13 +361,14 @@ public struct AuthView: View {
                     Image("PasskeyLight")
                         .resizable()
                         .renderingMode(.template)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.bordered)
                 .clipShape(.capsule)
                 .disabled(isLoading)
+            }
             }
         }
     }
@@ -339,14 +383,24 @@ public struct AuthView: View {
                 
                 #if os(iOS)
                 TextField("Email", text: $passkeySignUpEmail)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
-                    .clipShape(.capsule)
                 #else
                 TextField("Email", text: $passkeySignUpEmail)
-                    .textFieldStyle(.roundedBorder)
-                    .clipShape(.capsule)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
                 #endif
                 
                 Button(action: {
@@ -360,9 +414,11 @@ public struct AuthView: View {
                 }) {
                     if isLoading {
                         ProgressView()
+                            .padding(.vertical, 8)
                     } else {
                         Text("Confirm")
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                     }
                 }
                 .buttonStyle(.borderedProminent)
