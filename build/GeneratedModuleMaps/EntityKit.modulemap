@@ -1,0 +1,4 @@
+module EntityKit {
+header "EntityKit-Swift.h"
+export *
+}

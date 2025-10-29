@@ -1,0 +1,129 @@
+{
+  "" : {
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthUI-primary.dia",
+    "emit-module-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthUI-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthUI-primary-emit-module.dia",
+    "pch" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthUI-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthUI-primary.swiftdeps"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Environment/EntityAuthEnvironment.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityAuthEnvironment~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Gallery/GalleryView.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/GalleryView~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Registry/ComponentRegistry.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/ComponentRegistry~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Sandbox/SandboxRootView.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/SandboxRootView~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Theme/EntityTheme.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/EntityTheme~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/ViewModels/AuthViewModel.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthViewModel~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/ViewModels/UserDisplayViewModel.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplayViewModel~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/ViewModels/UserProfileViewModel.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfileViewModel~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Views/AuthGate.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthGate~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Views/AuthView.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/AuthView~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Views/UserDisplay.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserDisplay~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthUI/Views/UserProfile.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthUI.build/Objects-normal/x86_64/UserProfile~partial.swiftmodule"
+  }
+}

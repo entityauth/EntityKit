@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/EntityAuthRealtime-primary.dia",
+    "emit-module-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/EntityAuthRealtime-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/EntityAuthRealtime-primary-emit-module.dia",
+    "pch" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/EntityAuthRealtime-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/EntityAuthRealtime-primary.swiftdeps"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthRealtime/RealtimeService.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthRealtime.build/Objects-normal/x86_64/RealtimeService~partial.swiftmodule"
+  }
+}

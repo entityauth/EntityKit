@@ -1,0 +1,4 @@
+module convexmobileFFI {
+    header "convexmobileFFI.h"
+    export *
+}

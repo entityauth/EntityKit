@@ -55,38 +55,73 @@ public struct AuthView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 8) {
-                Text(selectedTab == .signIn ? "Sign in to your dashboard" : "Create account")
-                    .font(.title3)
-                    .bold()
-                
-                if let errorText {
-                    Text(errorText)
-                        .foregroundStyle(.red)
+        GeometryReader { geometry in
+            HStack {
+                Spacer()
+                VStack(spacing: 24) {
+                    // Header - OUTSIDE the card
+                    VStack(spacing: 8) {
+                        // Entity Auth branding
+                        Text("Entity Auth")
+                            .font(.largeTitle)
+                            .bold()
+                        
+                        Text(selectedTab == .signIn ? "Sign in to your dashboard" : "Create account")
+                            .foregroundStyle(.secondary)
+                        
+                        if let errorText {
+                            Text(errorText)
+                                .foregroundStyle(.red)
+                                .font(.footnote)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                    }
+                    .frame(maxWidth: 448)
+                    
+                    // Card - Contains Tab Picker and Forms
+                    VStack(spacing: 12) {
+                        // Tab Picker
+                        Picker("", selection: $selectedTab) {
+                            Text("Sign in").tag(AuthTab.signIn)
+                            Text("Create account").tag(AuthTab.register)
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        if selectedTab == .signIn {
+                            signInView
+                        } else {
+                            registerView
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        ConcentricRectangle()
+                            .fill(.regularMaterial)
+                    )
+                    .clipShape(ConcentricRectangle())
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+                    .containerShape(.rect(cornerRadius: theme.design.cornerRadius))
+                    .frame(maxWidth: 448)
+                    
+                    // Back link - OUTSIDE the card
+                    Button(action: {
+                        // Navigation could be added here if needed
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.left")
+                            Text("Back to Entity Auth")
+                        }
                         .font(.footnote)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: 448)
                 }
-            }
-            
-            // Tab Picker
-            Picker("", selection: $selectedTab) {
-                Text("Sign in").tag(AuthTab.signIn)
-                Text("Create account").tag(AuthTab.register)
-            }
-            .pickerStyle(.segmented)
-            
-            if selectedTab == .signIn {
-                signInView
-            } else {
-                registerView
+                .frame(maxWidth: 448)
+                Spacer()
             }
         }
-        .padding(24)
-        .background(theme.colors.background)
-        .clipShape(RoundedRectangle(cornerRadius: theme.design.cornerRadius))
         .sheet(isPresented: $showPasskeySignUpSheet) {
             passkeySignUpSheet
         }
@@ -103,15 +138,18 @@ public struct AuthView: View {
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
                 .disabled(isLoading)
+                .clipShape(.capsule)
             #else
             TextField("Email", text: $email)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isLoading)
+                .clipShape(.capsule)
             #endif
             
             SecureField("Password", text: $password)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isLoading)
+                .clipShape(.capsule)
             
             Button(action: {
                 Task {
@@ -129,11 +167,12 @@ public struct AuthView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
+            .clipShape(.capsule)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
             .tint(theme.colors.primary)
             
-            // SSO & Passkey Buttons
-            VStack(spacing: 8) {
+            // SSO & Passkey Buttons (icon-only in a row)
+            HStack(spacing: 8) {
                 Button(action: {
                     Task {
                         isLoading = true
@@ -141,13 +180,15 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    HStack {
-                        Image(systemName: "globe")
-                        Text("Continue with Google")
-                    }
-                    .frame(maxWidth: .infinity)
+                    Image("Google")
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
                 }
                 .buttonStyle(.bordered)
+                .clipShape(.capsule)
                 .disabled(isLoading)
                 
                 Button(action: {
@@ -157,13 +198,15 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    HStack {
-                        Image(systemName: "chevron.left.forwardslash.chevron.right")
-                        Text("Continue with GitHub")
-                    }
-                    .frame(maxWidth: .infinity)
+                    Image("GithubLight")
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
                 }
                 .buttonStyle(.bordered)
+                .clipShape(.capsule)
                 .disabled(isLoading)
                 
                 Button(action: {
@@ -173,13 +216,15 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    HStack {
-                        Image(systemName: "key.fill")
-                        Text("Sign in with Passkey")
-                    }
-                    .frame(maxWidth: .infinity)
+                    Image("PasskeyLight")
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
                 }
                 .buttonStyle(.bordered)
+                .clipShape(.capsule)
                 .disabled(isLoading)
             }
         }
@@ -196,15 +241,18 @@ public struct AuthView: View {
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
                 .disabled(isLoading)
+                .clipShape(.capsule)
             #else
             TextField("Email", text: $email)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isLoading)
+                .clipShape(.capsule)
             #endif
             
             SecureField("Password", text: $password)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isLoading)
+                .clipShape(.capsule)
             
             Button(action: {
                 Task {
@@ -222,21 +270,62 @@ public struct AuthView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
+            .clipShape(.capsule)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
             .tint(theme.colors.primary)
             
-            // Passkey Sign Up Button
-            Button(action: {
-                showPasskeySignUpSheet = true
-            }) {
-                HStack {
-                    Image(systemName: "key.fill")
-                    Text("Sign up with Passkey")
+            // SSO & Passkey Buttons (icon-only in a row)
+            HStack(spacing: 8) {
+                Button(action: {
+                    Task {
+                        isLoading = true
+                        await onGoogleSignIn?()
+                        isLoading = false
+                    }
+                }) {
+                    Image("Google")
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
                 }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.bordered)
+                .clipShape(.capsule)
+                .disabled(isLoading)
+                
+                Button(action: {
+                    Task {
+                        isLoading = true
+                        await onGitHubSignIn?()
+                        isLoading = false
+                    }
+                }) {
+                    Image("GithubLight")
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                }
+                .buttonStyle(.bordered)
+                .clipShape(.capsule)
+                .disabled(isLoading)
+                
+                Button(action: {
+                    showPasskeySignUpSheet = true
+                }) {
+                    Image("PasskeyLight")
+                        .resizable()
+                        .renderingMode(.template)
+                        .frame(width: 20, height: 20)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                }
+                .buttonStyle(.bordered)
+                .clipShape(.capsule)
+                .disabled(isLoading)
             }
-            .buttonStyle(.bordered)
-            .disabled(isLoading)
         }
     }
     
@@ -253,9 +342,11 @@ public struct AuthView: View {
                     .textFieldStyle(.roundedBorder)
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
+                    .clipShape(.capsule)
                 #else
                 TextField("Email", text: $passkeySignUpEmail)
                     .textFieldStyle(.roundedBorder)
+                    .clipShape(.capsule)
                 #endif
                 
                 Button(action: {
@@ -275,6 +366,7 @@ public struct AuthView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .clipShape(.capsule)
                 .disabled(passkeySignUpEmail.isEmpty || isLoading)
                 
                 Spacer()

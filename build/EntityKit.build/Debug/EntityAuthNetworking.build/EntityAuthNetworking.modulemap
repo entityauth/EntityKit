@@ -1,0 +1,4 @@
+module EntityAuthNetworking {
+header "EntityAuthNetworking-Swift.h"
+export *
+}

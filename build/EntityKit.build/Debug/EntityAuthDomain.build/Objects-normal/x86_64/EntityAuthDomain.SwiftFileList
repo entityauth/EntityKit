@@ -1,0 +1,11 @@
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/AuthService.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/CombinedAuthOrchestrator.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/DTOs.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/EntitiesService.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/EntityAuthSSO.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/EntityKit.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/Facade.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/GraphQLRequestEncoder.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/Models.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/OrganizationService.swift
+/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthDomain/PasskeyAuthService.swift

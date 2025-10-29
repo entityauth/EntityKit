@@ -56,8 +56,20 @@ let package = Package(
                 "EntityAuthNetworking",
                 "EntityAuthDomain",
                 "EntityAuthRealtime"
+            ],
+            resources: [
+                .process("Resources")
             ]
         ),
-        .testTarget(name: "EntityKitTests", dependencies: ["EntityKit"])
+        .testTarget(
+            name: "EntityKitTests",
+            dependencies: [
+                "EntityKit",
+                "EntityAuthCore",
+                "EntityAuthNetworking",
+                "EntityAuthDomain",
+                "EntityAuthRealtime"
+            ]
+        )
     ]
 )

@@ -1,0 +1,4 @@
+module EntityAuthRealtime {
+header "EntityAuthRealtime-Swift.h"
+export *
+}

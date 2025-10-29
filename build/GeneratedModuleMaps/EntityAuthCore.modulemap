@@ -1,0 +1,4 @@
+module EntityAuthCore {
+header "EntityAuthCore-Swift.h"
+export *
+}

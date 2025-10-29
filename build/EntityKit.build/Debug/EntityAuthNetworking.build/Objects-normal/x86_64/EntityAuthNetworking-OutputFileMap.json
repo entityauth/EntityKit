@@ -1,0 +1,49 @@
+{
+  "" : {
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/EntityAuthNetworking-primary.dia",
+    "emit-module-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/EntityAuthNetworking-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/EntityAuthNetworking-primary-emit-module.dia",
+    "pch" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/EntityAuthNetworking-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/EntityAuthNetworking-primary.swiftdeps"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthNetworking/APIClient.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIClient~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthNetworking/APIRequest.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIRequest~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthNetworking/APIResponse.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/APIResponse~partial.swiftmodule"
+  },
+  "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/Sources/EntityAuthNetworking/TokenRefresher.swift" : {
+    "const-values" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher.swiftconstvalues",
+    "dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher.d",
+    "diagnostics" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher.dia",
+    "index-unit-output-path" : "/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher.o",
+    "llvm-bc" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher.bc",
+    "object" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher.o",
+    "swift-dependencies" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher.swiftdeps",
+    "swiftmodule" : "/Users/naaiyy/Developer/EntityWorkspace/EntityKit/build/EntityKit.build/Debug/EntityAuthNetworking.build/Objects-normal/x86_64/TokenRefresher~partial.swiftmodule"
+  }
+}

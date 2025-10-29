@@ -1,0 +1,4 @@
+module EntityAuthDomain {
+header "EntityAuthDomain-Swift.h"
+export *
+}

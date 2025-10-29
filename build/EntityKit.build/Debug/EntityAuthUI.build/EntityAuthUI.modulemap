@@ -1,0 +1,4 @@
+module EntityAuthUI {
+header "EntityAuthUI-Swift.h"
+export *
+}
