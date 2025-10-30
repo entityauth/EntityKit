@@ -158,7 +158,12 @@ private struct UserProfileSheet: View {
 
             Spacer()
 
-            Button(role: .destructive, action: {}) {
+            Button(role: .destructive, action: {
+                Task {
+                    try? await provider.logout()
+                    isPresented = false
+                }
+            }) {
                 HStack(spacing: 8) {
                     Image(systemName: "rectangle.portrait.and.arrow.right")
                         .frame(width: 18)
@@ -215,7 +220,12 @@ private struct UserProfileSheet: View {
     }
 
     private var signOutRow: some View {
-        Button(role: .destructive, action: {}) {
+        Button(role: .destructive, action: {
+            Task {
+                try? await provider.logout()
+                isPresented = false
+            }
+        }) {
             HStack(spacing: 12) {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
                     .frame(width: 20)

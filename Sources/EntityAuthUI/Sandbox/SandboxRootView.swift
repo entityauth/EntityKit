@@ -6,6 +6,13 @@ public struct SandboxRootView: View {
     @Environment(\.entityAuthProvider) private var provider
 
     public init() {}
+    
+    /// Convenience initializer that sets up the sandbox with mock auth provider
+    public static func withMockAuth() -> some View {
+        SandboxRootView()
+            .entityTheme(.default)
+            .entityAuthProvider(.preview(name: "John Appleseed", email: "john@example.com"))
+    }
 
     public var body: some View {
         NavigationSplitView {
@@ -68,6 +75,7 @@ private struct AuthOrContent: View {
 
 private struct Preview: View {
     let item: ComponentItem
+    @Environment(\.entityAuthProvider) private var provider
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var errorText: String?
@@ -78,45 +86,20 @@ private struct Preview: View {
             AuthView(
                 email: $email,
                 password: $password,
-                errorText: $errorText,
-                onGoogleSignIn: {
-                    // Mock Google SSO callback for preview
-                    print("[Preview] Google SSO sign-in tapped")
-                    errorText = "Preview mode - Google SSO not implemented"
-                },
-                onGitHubSignIn: {
-                    // Mock GitHub SSO callback for preview
-                    print("[Preview] GitHub SSO sign-in tapped")
-                    errorText = "Preview mode - GitHub SSO not implemented"
-                },
-                onPasskeySignIn: {
-                    // Mock Passkey sign-in callback for preview
-                    print("[Preview] Passkey sign-in tapped")
-                    errorText = "Preview mode - Passkey sign-in not implemented"
-                },
-                onPasskeySignUp: { email in
-                    // Mock Passkey sign-up callback for preview
-                    print("[Preview] Passkey sign-up tapped: \(email)")
-                    errorText = "Preview mode - Passkey sign-up not implemented"
-                },
-                onEmailSignIn: { email, password in
-                    // Mock email sign-in callback for preview
-                    print("[Preview] Email sign-in tapped: \(email)")
-                    errorText = "Preview mode - Email sign-in not implemented"
-                },
-                onEmailRegister: { email, password in
-                    // Mock email registration callback for preview
-                    print("[Preview] Email registration tapped: \(email)")
-                    errorText = "Preview mode - Email registration not implemented"
-                }
+                errorText: $errorText
             )
+        case .authViewModal:
+            VStack(spacing: 16) {
+                Text("Tap to present auth in a modal").font(.caption).foregroundStyle(.secondary)
+                AuthViewModal(title: "Sign in")
+            }
         case .userProfile:
             VStack(spacing: 12) {
                 Text("Toolbar-style preview").font(.caption).foregroundStyle(.secondary)
                 UserProfile()
             }
         case .userDisplay:
-            UserDisplay()
+            UserDisplay(provider: provider)
         }
     }
 }

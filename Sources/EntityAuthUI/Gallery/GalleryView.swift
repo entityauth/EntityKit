@@ -33,17 +33,26 @@ public struct GalleryView: View {
 
 private struct Preview: View {
     let item: ComponentItem
+    @Environment(\.entityAuthProvider) private var provider
 
     var body: some View {
         switch item.component {
         case .authView:
             AuthView()
                 .padding(.vertical, 8)
+        case .authViewModal:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Modal variant")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                AuthViewModal(title: "Sign in")
+            }
+            .padding(.vertical, 8)
         case .userProfile:
             UserProfile()
                 .padding(.vertical, 8)
         case .userDisplay:
-            UserDisplay()
+            UserDisplay(provider: provider)
                 .padding(.vertical, 8)
         }
     }

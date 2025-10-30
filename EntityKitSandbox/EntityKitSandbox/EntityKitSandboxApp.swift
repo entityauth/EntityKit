@@ -6,12 +6,13 @@
 //
 
 import SwiftUI
+import EntityAuthUI
 
 @main
 struct EntityKitSandboxApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SandboxRootView.withMockAuth()
         }
     }
 }

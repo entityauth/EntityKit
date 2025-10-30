@@ -1,13 +1,15 @@
 import SwiftUI
 
 public struct UserDisplay: View {
-    @Environment(\.entityAuthProvider) private var provider
-    @State private var viewModel: UserDisplayViewModel? = nil
+    @StateObject private var viewModel: UserDisplayViewModel
 
-    public init() {}
+    /// Explicit provider injection so SwiftUI can observe the view model with @StateObject.
+    public init(provider: AnyEntityAuthProvider) {
+        _viewModel = StateObject(wrappedValue: UserDisplayViewModel(provider: provider))
+    }
 
     public var body: some View {
-        let out = viewModel?.output
+        let out = viewModel.output as UserDisplayViewModel.Output?
         VStack(alignment: .leading, spacing: 6) {
             if out == nil || out!.isLoading {
                 RoundedRectangle(cornerRadius: 6).fill(.tertiary).frame(width: 120, height: 14)
@@ -15,11 +17,6 @@ public struct UserDisplay: View {
             } else {
                 Text(out!.name ?? "User").font(.headline)
                 Text(out!.email ?? "").font(.subheadline).foregroundStyle(.secondary)
-            }
-        }
-        .onAppear {
-            if viewModel == nil {
-                viewModel = UserDisplayViewModel(provider: provider)
             }
         }
     }

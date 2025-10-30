@@ -20,6 +20,7 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _passkeySignUp: @Sendable (_ email: String, _ rpId: String, _ origins: [String]) async throws -> LoginResponse
     private let _rpId: @Sendable () -> String?
     private let _origins: @Sendable () -> [String]?
+    private let _logout: @Sendable () async throws -> Void
 
     public init(
         stream: @escaping @Sendable () async -> AsyncStream<Snapshot>,
@@ -34,7 +35,8 @@ public struct AnyEntityAuthProvider: Sendable {
         passkeySignIn: @escaping @Sendable (_ rpId: String, _ origins: [String]) async throws -> LoginResponse,
         passkeySignUp: @escaping @Sendable (_ email: String, _ rpId: String, _ origins: [String]) async throws -> LoginResponse,
         rpId: @escaping @Sendable () -> String?,
-        origins: @escaping @Sendable () -> [String]?
+        origins: @escaping @Sendable () -> [String]?,
+        logout: @escaping @Sendable () async throws -> Void
     ) {
         self._stream = stream
         self._current = current
@@ -49,6 +51,7 @@ public struct AnyEntityAuthProvider: Sendable {
         self._passkeySignUp = passkeySignUp
         self._rpId = rpId
         self._origins = origins
+        self._logout = logout
     }
 
     public func snapshotStream() async -> AsyncStream<Snapshot> { await _stream() }
@@ -64,6 +67,7 @@ public struct AnyEntityAuthProvider: Sendable {
     public func passkeySignUp(email: String, rpId: String, origins: [String]) async throws -> LoginResponse { try await _passkeySignUp(email, rpId, origins) }
     public func rpId() -> String? { _rpId() }
     public func origins() -> [String]? { _origins() }
+    public func logout() async throws { try await _logout() }
 }
 
 public extension AnyEntityAuthProvider {
@@ -91,7 +95,8 @@ public extension AnyEntityAuthProvider {
                 try await facade.passkeySignUp(email: email, rpId: rpId, origins: origins)
             },
             rpId: { config.rpId },
-            origins: { config.origins }
+            origins: { config.origins },
+            logout: { try await facade.logout() }
         )
     }
 
@@ -121,7 +126,8 @@ public extension AnyEntityAuthProvider {
             passkeySignIn: { _, _ in throw NSError(domain: "preview", code: -1) },
             passkeySignUp: { _, _, _ in throw NSError(domain: "preview", code: -1) },
             rpId: { nil },
-            origins: { nil }
+            origins: { nil },
+            logout: { }
         )
     }
 }

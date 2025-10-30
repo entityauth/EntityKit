@@ -2,6 +2,7 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
+import EntityAuthDomain
 
 /// Pure UI component for authentication - displays SSO buttons, passkey, and email/password form.
 /// Takes callbacks for actions. NO business logic.
@@ -26,6 +27,8 @@ public struct AuthView: View {
     public var onEmailRegister: ((String, String) async -> Void)?
     
     @Environment(\.entityTheme) private var theme
+    @Environment(\.entityAuthProvider) private var provider
+    @Environment(\.colorScheme) private var colorScheme
     
     public enum AuthTab {
         case signIn
@@ -170,24 +173,26 @@ public struct AuthView: View {
                 )
                 .disabled(isLoading)
             
-            Button(action: {
-                Task {
-                    isLoading = true
-                    await onEmailSignIn?(email, password)
-                    isLoading = false
-                }
-            }) {
+                    Button(action: {
+                        let action = onEmailSignIn ?? AuthDefaultActions.makeEmailSignIn(provider: provider, errorText: $errorText)
+                        Task {
+                            isLoading = true
+                            await action(email, password)
+                            isLoading = false
+                        }
+                    }) {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 } else {
                     Text("Sign in")
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.small)
             .clipShape(.capsule)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
             .tint(theme.colors.primary)
@@ -195,9 +200,10 @@ public struct AuthView: View {
             // SSO & Passkey Buttons (icon-only in a row)
             HStack(spacing: 8) {
                 Button(action: {
+                    let action = onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText)
                     Task {
                         isLoading = true
-                        await onGoogleSignIn?()
+                        await action()
                         isLoading = false
                     }
                 }) {
@@ -206,16 +212,18 @@ public struct AuthView: View {
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .clipShape(.capsule)
                 .disabled(isLoading)
                 
                 Button(action: {
+                    let action = onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText)
                     Task {
                         isLoading = true
-                        await onGitHubSignIn?()
+                        await action()
                         isLoading = false
                     }
                 }) {
@@ -224,27 +232,30 @@ public struct AuthView: View {
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .clipShape(.capsule)
                 .disabled(isLoading)
                 
                 Button(action: {
+                    let action = onPasskeySignIn ?? AuthDefaultActions.makePasskeySignIn(provider: provider, errorText: $errorText)
                     Task {
                         isLoading = true
-                        await onPasskeySignIn?()
+                        await action()
                         isLoading = false
                     }
                 }) {
-                    Image("PasskeyLight")
+                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight")
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .clipShape(.capsule)
                 .disabled(isLoading)
             }
@@ -296,23 +307,25 @@ public struct AuthView: View {
                 .disabled(isLoading)
             
             Button(action: {
+                let action = onEmailRegister ?? AuthDefaultActions.makeEmailRegister(provider: provider, errorText: $errorText)
                 Task {
                     isLoading = true
-                    await onEmailRegister?(email, password)
+                    await action(email, password)
                     isLoading = false
                 }
             }) {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 } else {
                     Text("Create account")
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.small)
             .clipShape(.capsule)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
             .tint(theme.colors.primary)
@@ -320,9 +333,10 @@ public struct AuthView: View {
             // SSO & Passkey Buttons (icon-only in a row)
             HStack(spacing: 8) {
                 Button(action: {
+                    let action = onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText)
                     Task {
                         isLoading = true
-                        await onGoogleSignIn?()
+                        await action()
                         isLoading = false
                     }
                 }) {
@@ -331,16 +345,18 @@ public struct AuthView: View {
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .clipShape(.capsule)
                 .disabled(isLoading)
                 
                 Button(action: {
+                    let action = onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText)
                     Task {
                         isLoading = true
-                        await onGitHubSignIn?()
+                        await action()
                         isLoading = false
                     }
                 }) {
@@ -349,23 +365,25 @@ public struct AuthView: View {
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .clipShape(.capsule)
                 .disabled(isLoading)
                 
                 Button(action: {
                     showPasskeySignUpSheet = true
                 }) {
-                    Image("PasskeyLight")
+                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight")
                         .resizable()
-                        .renderingMode(.template)
+                        .renderingMode(.original)
                         .frame(width: 18, height: 18)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .clipShape(.capsule)
                 .disabled(isLoading)
             }
@@ -414,14 +432,15 @@ public struct AuthView: View {
                 }) {
                     if isLoading {
                         ProgressView()
-                            .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                     } else {
                         Text("Confirm")
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                        .padding(.vertical, 6)
                     }
                 }
                 .buttonStyle(.borderedProminent)
+            .controlSize(.small)
                 .clipShape(.capsule)
                 .disabled(passkeySignUpEmail.isEmpty || isLoading)
                 

@@ -2,6 +2,7 @@ import Foundation
 
 public enum ComponentKind: String, CaseIterable, Sendable {
     case authView = "auth-view"
+    case authViewModal = "auth-view-modal"
     case userProfile = "user-profile"
     case userDisplay = "user-display"
 }
@@ -24,6 +25,14 @@ public let componentRegistry: [ComponentItem] = [
         keywords: ["auth", "signin", "signup"],
         group: "Core",
         component: .authView
+    ),
+    .init(
+        title: "Auth View (Modal Button)",
+        slug: ["auth", "modal"],
+        description: "Button that presents AuthView in a modal",
+        keywords: ["auth", "modal", "signin", "signup"],
+        group: "Core",
+        component: .authViewModal
     ),
     .init(
         title: "User Profile",
