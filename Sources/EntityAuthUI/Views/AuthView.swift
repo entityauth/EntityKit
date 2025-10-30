@@ -207,7 +207,7 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image("Google")
+                    Image("Google", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
@@ -227,7 +227,7 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image("GithubLight")
+                    Image("GithubLight", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
@@ -247,7 +247,7 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight")
+                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
@@ -340,7 +340,7 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image("Google")
+                    Image("Google", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
@@ -360,7 +360,7 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image("GithubLight")
+                    Image("GithubLight", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)
@@ -375,7 +375,7 @@ public struct AuthView: View {
                 Button(action: {
                     showPasskeySignUpSheet = true
                 }) {
-                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight")
+                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: 18, height: 18)

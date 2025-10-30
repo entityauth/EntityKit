@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B842447E2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */ = {isa = PBXBuildFile; fileRef = B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */; };
+		B842447F2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */ = {isa = PBXBuildFile; fileRef = B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */; };
 		B8C7ADC02EA5F7370079C5D9 /* EntityKit in Frameworks */ = {isa = PBXBuildFile; productRef = B8C7ADBF2EA5F7370079C5D9 /* EntityKit */; };
 		B8C7ADC32EA5F74B0079C5D9 /* EntityKit in Frameworks */ = {isa = PBXBuildFile; productRef = B8C7ADC22EA5F74B0079C5D9 /* EntityKit */; };
 		B8C7ADC62EA5FAEF0079C5D9 /* EntityAuthUI in Frameworks */ = {isa = PBXBuildFile; productRef = B8C7ADC52EA5FAEF0079C5D9 /* EntityAuthUI */; };
@@ -14,6 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = EntityKitSandbox.icon; sourceTree = "<group>"; };
 		B8C7AD9E2EA5F4C10079C5D9 /* EntityKitSandbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EntityKitSandbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B8C7ADB32EA5F7210079C5D9 /* EntityKitSandboxiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EntityKitSandboxiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -83,6 +86,7 @@
 				B8C7ADB42EA5F7210079C5D9 /* EntityKitSandboxiOS */,
 				B8C7ADC42EA5FAEF0079C5D9 /* Frameworks */,
 				B8C7AD9F2EA5F4C10079C5D9 /* Products */,
+				B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -199,6 +203,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B842447E2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -206,6 +211,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B842447F2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -356,8 +362,9 @@
 		B8C7ADAA2EA5F4C10079C5D9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = EntityKitSandbox;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = EntityKitSandbox/EntityKitSandbox.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -394,8 +401,9 @@
 		B8C7ADAB2EA5F4C10079C5D9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = EntityKitSandbox;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = EntityKitSandbox/EntityKitSandbox.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -432,7 +440,7 @@
 		B8C7ADBC2EA5F7220079C5D9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = EntityKitSandbox;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -467,7 +475,7 @@
 		B8C7ADBD2EA5F7220079C5D9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = EntityKitSandbox;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
