@@ -6,9 +6,9 @@ public protocol OrganizationsProviding: Sendable {
     func create(name: String, slug: String, ownerId: String) async throws
     func create(workspaceTenantId: String, name: String, slug: String, ownerId: String) async throws
     func addMember(orgId: String, userId: String, role: String) async throws
-    func switchActive(orgId: String) async throws
-    func switchOrg(orgId: String) async throws
-    func switchActive(workspaceTenantId: String, orgId: String) async throws
+    func switchActive(orgId: String) async throws -> String
+    func switchOrg(orgId: String) async throws -> String
+    func switchActive(workspaceTenantId: String, orgId: String) async throws -> String
     func list() async throws -> [OrganizationSummaryDTO]
     func active() async throws -> ActiveOrganizationDTO?
 }
@@ -66,24 +66,30 @@ public final class OrganizationService: OrganizationsProviding {
         _ = try await client.send(request)
     }
 
-    public func switchOrg(orgId: String) async throws {
+    public func switchOrg(orgId: String) async throws -> String {
         if let workspaceTenantId = client.workspaceTenantId {
-            try await switchActive(workspaceTenantId: workspaceTenantId, orgId: orgId)
+            return try await switchActive(workspaceTenantId: workspaceTenantId, orgId: orgId)
         } else {
             throw EntityAuthError.configurationMissingWorkspaceTenantId
         }
     }
 
-    public func switchActive(orgId: String) async throws {
+    public func switchActive(orgId: String) async throws -> String {
         if let workspaceTenantId = client.workspaceTenantId {
-            try await switchActive(workspaceTenantId: workspaceTenantId, orgId: orgId)
+            return try await switchActive(workspaceTenantId: workspaceTenantId, orgId: orgId)
         } else {
             throw EntityAuthError.configurationMissingWorkspaceTenantId
         }
     }
 
-    public func switchActive(workspaceTenantId: String, orgId: String) async throws {
-        // No-op under generic model (active org handled via realtime/state)
+    public func switchActive(workspaceTenantId: String, orgId: String) async throws -> String {
+        // Call EA endpoint to re-issue access token with new oid
+        struct SwitchResponse: Decodable { let accessToken: String; let organizationId: String }
+        let payload: [String: Any] = ["organizationId": orgId]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let request = APIRequest(method: .post, path: "/api/auth/switch-organization", headers: ["content-type": "application/json"], body: body)
+        let response: SwitchResponse = try await client.send(request, decode: SwitchResponse.self)
+        return response.accessToken
     }
 
     public func list() async throws -> [OrganizationSummaryDTO] {

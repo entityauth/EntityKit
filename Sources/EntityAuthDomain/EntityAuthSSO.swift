@@ -113,7 +113,7 @@ public final class EntityAuthSSO: NSObject, EntityAuthSSOHandling, ASWebAuthenti
                             continuation.resume(with: .failure(error ?? NSError(domain: "EntityAuthSSO", code: -1)))
                             return
                         }
-                        var comps = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
+                        let comps = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
                         let ticket = comps?.queryItems?.first { $0.name == "ticket" }?.value
                         EntityAuthDebugLog.log("[EntityAuthSSO] parsed ticket=", ticket ?? "<nil>")
                         guard let ticket else {
@@ -192,9 +192,9 @@ public final class EntityAuthSSO: NSObject, EntityAuthSSOHandling, ASWebAuthenti
         return try await EntityAuthSSO.handleCallbackStatic(baseURL: baseURL, url: url)
     }
 
-    private static func handleCallbackStatic(baseURL: URL, url: URL) async throws -> (accessToken: String, refreshToken: String, sessionId: String, userId: String) {
+    static func handleCallbackStatic(baseURL: URL, url: URL) async throws -> (accessToken: String, refreshToken: String, sessionId: String, userId: String) {
         EntityAuthDebugLog.log("[EntityAuthSSO] handleCallbackStatic url=", url.absoluteString)
-        var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let ticket = comps?.queryItems?.first { $0.name == "ticket" }?.value
         EntityAuthDebugLog.log("[EntityAuthSSO] parsed ticket=", ticket ?? "<nil>")
         guard let ticket else { throw NSError(domain: "EntityAuthSSO", code: 3, userInfo: [NSLocalizedDescriptionKey: "Missing ticket"]) }

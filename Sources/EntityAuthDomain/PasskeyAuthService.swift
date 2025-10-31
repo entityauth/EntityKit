@@ -42,12 +42,16 @@ extension PasskeyAuthService: PasskeyAuthProviding {
         }
         // Build WebAuthn registration credential payload as expected by server
         // Note: rawId and response fields are base64url encoded
+        guard let attObj = reg.rawAttestationObject else {
+            throw EntityAuthError.invalidResponse
+        }
+        let clientData = reg.rawClientDataJSON
         let credential = WebAuthnRegistrationCredential(
             id: reg.credentialID.base64urlEncodedString(),
             rawId: reg.credentialID.base64urlEncodedString(),
             response: .init(
-                attestationObject: (reg.rawAttestationObject ?? Data()).base64urlEncodedString(),
-                clientDataJSON: (reg.rawClientDataJSON ?? Data()).base64urlEncodedString()
+                attestationObject: attObj.base64urlEncodedString(),
+                clientDataJSON: clientData.base64urlEncodedString()
             )
         )
         return try await authService.finishRegistration(
@@ -77,12 +81,16 @@ extension PasskeyAuthService: PasskeyAuthProviding {
         guard let reg = result.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration else {
             throw EntityAuthError.invalidResponse
         }
+        guard let attObj2 = reg.rawAttestationObject else {
+            throw EntityAuthError.invalidResponse
+        }
+        let clientData2 = reg.rawClientDataJSON
         let credential = WebAuthnRegistrationCredential(
             id: reg.credentialID.base64urlEncodedString(),
             rawId: reg.credentialID.base64urlEncodedString(),
             response: .init(
-                attestationObject: (reg.rawAttestationObject ?? Data()).base64urlEncodedString(),
-                clientDataJSON: (reg.rawClientDataJSON ?? Data()).base64urlEncodedString()
+                attestationObject: attObj2.base64urlEncodedString(),
+                clientDataJSON: clientData2.base64urlEncodedString()
             )
         )
         return try await authService.finishRegistrationWithEmail(
@@ -140,6 +148,7 @@ extension PasskeyAuthService {
     }
 
     #if canImport(AuthenticationServices)
+    @MainActor
     private func performAuthorization(requests: [ASAuthorizationRequest]) async throws -> ASAuthorization {
         try await withCheckedThrowingContinuation { continuation in
             let controller = ASAuthorizationController(authorizationRequests: requests)

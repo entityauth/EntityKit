@@ -311,7 +311,7 @@ public actor EntityAuthFacade {
     public struct SSOBootstrapOptions: Sendable {
         public var createEAOrgIfMissing: Bool
         public var defaultOrgName: String?
-        public init(createEAOrgIfMissing: Bool = true, defaultOrgName: String? = nil) {
+        public init(createEAOrgIfMissing: Bool = false, defaultOrgName: String? = nil) {
             self.createEAOrgIfMissing = createEAOrgIfMissing
             self.defaultOrgName = defaultOrgName
         }
@@ -351,47 +351,13 @@ public actor EntityAuthFacade {
             }
         }
 
-        // Step 2: Ensure EA organization exists (optional)
+        // Step 2: Read EA organizations (no client-side creation)
         var eaOrgId: String? = nil
         do {
             let orgs = try await organizations()
             print("[EntityAuth][Bootstrap] orgs count=\(orgs.count)")
             if let existing = orgs.first { // Pick first membership as active org
                 eaOrgId = existing.orgId
-            } else if options.createEAOrgIfMissing {
-                // Create a default org in EA so Convex can bind to it
-                if let wid = dependencies.apiClient.workspaceTenantId, let ownerId = snapshot.userId {
-                    let name: String = options.defaultOrgName ?? (snapshot.username.map { "\($0)'s Organization" } ?? "Organization")
-                    let slug: String = normalizeUsername(name)
-                    do {
-                        let created = try await dependencies.entitiesService.createEnforced(
-                            workspaceTenantId: wid,
-                            kind: "org",
-                            properties: [
-                                "name": name,
-                                "slug": slug
-                            ],
-                            metadata: nil,
-                            actorId: ownerId
-                        )
-                        eaOrgId = created.id
-                        print("[EntityAuth][Bootstrap] created EA org id=\(created.id)")
-                    } catch {
-                        // Fall back to OrganizationService (no id returned)
-                        print("[EntityAuth][Bootstrap] createEnforced failed: \(error); falling back")
-                        try? await dependencies.organizationService.create(
-                            workspaceTenantId: wid,
-                            name: name,
-                            slug: slug,
-                            ownerId: ownerId
-                        )
-                        // Best-effort fetch memberships again to resolve id
-                        if let refreshed = try? await organizations().first?.orgId {
-                            eaOrgId = refreshed
-                            print("[EntityAuth][Bootstrap] resolved EA org via list id=\(refreshed)")
-                        }
-                    }
-                }
             }
         } catch {
             // If listing organizations fails, continue; Convex ensure may still create membership
@@ -467,7 +433,10 @@ public actor EntityAuthFacade {
     }
 
     public func switchOrg(orgId: String) async throws {
-        try await dependencies.organizationService.switchOrg(orgId: orgId)
+        let newAccessToken = try await dependencies.organizationService.switchOrg(orgId: orgId)
+        try dependencies.authState.update(accessToken: newAccessToken)
+        snapshot.accessToken = newAccessToken
+        subject.send(snapshot)
         try await refreshUserData()
     }
 
@@ -605,7 +574,7 @@ extension EntityAuthFacade {
                 snapshot.userId = me.id
                 subject.send(snapshot)
             } catch {
-                let description = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
+                _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
                 // If failure indicates expired/invalid access token, attempt one refresh then retry hydration
                 if shouldAttemptRefresh(after: error) {
                     do {
@@ -619,7 +588,7 @@ extension EntityAuthFacade {
                         snapshot.userId = me.id
                         subject.send(snapshot)
                     } catch {
-                        let desc = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
+                        _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
                     }
                 }
             }

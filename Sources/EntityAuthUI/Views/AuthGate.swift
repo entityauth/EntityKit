@@ -40,10 +40,11 @@ public struct AuthGate: View {
     
     /// Generic SSO sign-in logic - delegates to EntityAuthSSO
     private func signInSSO(provider providerName: String) async {
-        guard let tenant = provider.workspaceTenantId() else {
+        guard provider.workspaceTenantId() != nil else {
             errorText = "Missing tenant id"
             return
         }
+        let tenant = provider.workspaceTenantId()!
         
         let base = provider.baseURL()
         let sso = EntityAuthSSO(baseURL: base)
@@ -72,7 +73,7 @@ public struct AuthGate: View {
     
     /// Passkey sign-in logic
     private func signInWithPasskey() async {
-        guard let tenant = provider.workspaceTenantId() else {
+        guard provider.workspaceTenantId() != nil else {
             errorText = "Missing tenant id"
             return
         }
@@ -101,7 +102,7 @@ public struct AuthGate: View {
     
     /// Passkey sign-up logic
     private func signUpWithPasskey(email: String) async {
-        guard let tenant = provider.workspaceTenantId() else {
+        guard provider.workspaceTenantId() != nil else {
             errorText = "Missing tenant id"
             return
         }
