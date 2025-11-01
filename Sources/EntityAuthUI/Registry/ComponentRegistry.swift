@@ -5,6 +5,7 @@ public enum ComponentKind: String, CaseIterable, Sendable {
     case authViewModal = "auth-view-modal"
     case userProfile = "user-profile"
     case userDisplay = "user-display"
+    case organizationSwitcher = "organization-switcher"
 }
 
 public struct ComponentItem: Identifiable, Sendable, Equatable, Hashable {
@@ -49,6 +50,15 @@ public let componentRegistry: [ComponentItem] = [
         keywords: ["user", "identity"],
         group: "Core",
         component: .userDisplay
+    )
+    ,
+    .init(
+        title: "Organization Switcher",
+        slug: ["org", "switcher"],
+        description: "List, switch, and create organizations",
+        keywords: ["org", "organization", "switch"],
+        group: "Core",
+        component: .organizationSwitcher
     )
 ]
 

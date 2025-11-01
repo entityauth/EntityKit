@@ -29,7 +29,7 @@ public final class OrganizationService: OrganizationsProviding {
     }
 
     public func create(workspaceTenantId: String, name: String, slug: String, ownerId: String) async throws {
-        // Generic entity create (enforced): kind=org
+        // Create org entity
         let payload: [String: Any] = [
             "op": "createEnforced",
             "workspaceTenantId": workspaceTenantId,
@@ -42,7 +42,10 @@ public final class OrganizationService: OrganizationsProviding {
         ]
         let body = try JSONSerialization.data(withJSONObject: payload)
         let request = APIRequest(method: .post, path: "/api/entities", body: body)
-        _ = try await client.send(request)
+        struct CreateResponse: Decodable { let id: String }
+        let created: CreateResponse = try await client.send(request, decode: CreateResponse.self)
+        // Bootstrap membership: link owner
+        try await addMember(orgId: created.id, userId: ownerId, role: "owner")
     }
 
     public func addMember(orgId: String, userId: String, role: String) async throws {

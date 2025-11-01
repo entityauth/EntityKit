@@ -139,6 +139,9 @@ public actor EntityAuthFacade {
     private let subject: CurrentValueSubject<Snapshot, Never>
     private var realtimeCancellable: AnyCancellable?
     private let lastUserStore: LastUserStore
+    // Coalescing support to avoid emitting half-hydrated snapshots
+    private var emitSuppressionCount: Int = 0
+    private var hasPendingEmission: Bool = false
 
     public var snapshotPublisher: AnyPublisher<Snapshot, Never> {
         subject.eraseToAnyPublisher()
@@ -189,6 +192,27 @@ public actor EntityAuthFacade {
     public func currentSnapshot() -> Snapshot {
         snapshot
     }
+    
+    // MARK: - Emission control
+    private func emit() {
+        if emitSuppressionCount == 0 {
+            subject.send(snapshot)
+        } else {
+            hasPendingEmission = true
+        }
+    }
+    
+    private func coalesced<T>(_ work: () async throws -> T) async rethrows -> T {
+        emitSuppressionCount += 1
+        defer {
+            emitSuppressionCount -= 1
+            if emitSuppressionCount == 0, hasPendingEmission {
+                subject.send(snapshot)
+                hasPendingEmission = false
+            }
+        }
+        return try await work()
+    }
 
     public func updateBaseURL(_ baseURL: URL) async {
         dependencies.baseURLStore.save(baseURL: baseURL)
@@ -204,26 +228,28 @@ public actor EntityAuthFacade {
     }
 
     public func login(request: LoginRequest) async throws {
-        let req = request
-        let response = try await dependencies.authService.login(request: req)
-        try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
-        snapshot.accessToken = response.accessToken
-        snapshot.refreshToken = response.refreshToken
-        snapshot.sessionId = response.sessionId
-        snapshot.userId = response.userId
-        lastUserStore.save(id: response.userId)
-        subject.send(snapshot)
-        if let userId = snapshot.userId {
-            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        try await coalesced {
+            let req = request
+            let response = try await dependencies.authService.login(request: req)
+            try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+            snapshot.accessToken = response.accessToken
+            snapshot.refreshToken = response.refreshToken
+            snapshot.sessionId = response.sessionId
+            snapshot.userId = response.userId
+            lastUserStore.save(id: response.userId)
+            if let userId = snapshot.userId {
+                await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+            }
+            try await refreshUserData()
+            emit()
         }
-        try await refreshUserData()
     }
 
     public func logout() async throws {
         try await dependencies.authService.logout(sessionId: snapshot.sessionId, refreshToken: snapshot.refreshToken)
         try authState.clear()
         snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
-        subject.send(snapshot)
+        emit()
         await dependencies.realtime.stop()
         lastUserStore.clear()
     }
@@ -233,7 +259,7 @@ public actor EntityAuthFacade {
     public func hardResetLocalAuth() async {
         try? authState.clear()
         snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
-        subject.send(snapshot)
+        emit()
         await dependencies.realtime.stop()
         lastUserStore.clear()
     }
@@ -243,7 +269,7 @@ public actor EntityAuthFacade {
         try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
         snapshot.accessToken = response.accessToken
         snapshot.refreshToken = response.refreshToken
-        subject.send(snapshot)
+        emit()
     }
 
     // MARK: - Passkeys
@@ -255,17 +281,19 @@ public actor EntityAuthFacade {
             workspaceTenantId: dependencies.config.workspaceTenantId
         )
         let response = try await passkeyService.signIn(userId: nil, rpId: rpId, origins: origins)
-        try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
-        snapshot.accessToken = response.accessToken
-        snapshot.refreshToken = response.refreshToken
-        snapshot.sessionId = response.sessionId
-        snapshot.userId = response.userId
-        lastUserStore.save(id: response.userId)
-        subject.send(snapshot)
-        if let userId = snapshot.userId {
-            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        try await coalesced {
+            try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+            snapshot.accessToken = response.accessToken
+            snapshot.refreshToken = response.refreshToken
+            snapshot.sessionId = response.sessionId
+            snapshot.userId = response.userId
+            lastUserStore.save(id: response.userId)
+            if let userId = snapshot.userId {
+                await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+            }
+            try await refreshUserData()
+            emit()
         }
-        try await refreshUserData()
         return response
     }
     
@@ -276,17 +304,21 @@ public actor EntityAuthFacade {
             workspaceTenantId: dependencies.config.workspaceTenantId
         )
         let response = try await passkeyService.signUp(email: email, rpId: rpId, origins: origins)
-        try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
-        snapshot.accessToken = response.accessToken
-        snapshot.refreshToken = response.refreshToken
-        snapshot.sessionId = response.sessionId
-        snapshot.userId = response.userId
-        lastUserStore.save(id: response.userId)
-        subject.send(snapshot)
-        if let userId = snapshot.userId {
-            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        try await coalesced {
+            try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+            snapshot.accessToken = response.accessToken
+            snapshot.refreshToken = response.refreshToken
+            snapshot.sessionId = response.sessionId
+            snapshot.userId = response.userId
+            lastUserStore.save(id: response.userId)
+            if let userId = snapshot.userId {
+                await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+            }
+            try await refreshUserData()
+            try await ensureOrganizationAndActivateIfMissing()
+            try await refreshUserData()
+            emit()
         }
-        try await refreshUserData()
         return response
     }
 
@@ -294,16 +326,25 @@ public actor EntityAuthFacade {
 
     /// Apply externally obtained tokens (e.g., from SSO exchange) and hydrate state
     public func applyTokens(accessToken: String, refreshToken: String?, sessionId: String?, userId: String?) async throws {
-        try dependencies.authState.update(accessToken: accessToken, refreshToken: refreshToken)
-        snapshot.accessToken = accessToken
-        snapshot.refreshToken = refreshToken ?? snapshot.refreshToken
-        snapshot.sessionId = sessionId
-        snapshot.userId = userId
-        subject.send(snapshot)
-        if let userId = snapshot.userId {
-            await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+        try await coalesced {
+            try dependencies.authState.update(accessToken: accessToken, refreshToken: refreshToken)
+            snapshot.accessToken = accessToken
+            snapshot.refreshToken = refreshToken ?? snapshot.refreshToken
+            snapshot.sessionId = sessionId
+            snapshot.userId = userId
+            if let userId = snapshot.userId {
+                await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
+            }
+            // Hydrate and ensure org before first emission
+            try await refreshUserData()
+            try await ensureOrganizationAndActivateIfMissing()
+            try await refreshUserData()
+            if snapshot.activeOrganization == nil, let firstOrg = snapshot.organizations.first?.orgId {
+                let newToken = try? await dependencies.organizationService.switchOrg(orgId: firstOrg)
+                if let newToken { try? dependencies.authState.update(accessToken: newToken); snapshot.accessToken = newToken; try? await refreshUserData() }
+            }
+            emit()
         }
-        try await refreshUserData()
     }
 
     // MARK: - Post-SSO Bootstrap (parity with Web)
@@ -343,7 +384,7 @@ public actor EntityAuthFacade {
                 let req = APIRequest(method: .get, path: "/api/user/me")
                 let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
                 snapshot.userId = me.id
-                subject.send(snapshot)
+                emit()
                 print("[EntityAuth][Bootstrap] resolved userId=\(me.id)")
             } catch {
                 // If we cannot resolve user id, we cannot create EA org with an actorId
@@ -416,6 +457,8 @@ public actor EntityAuthFacade {
             await dependencies.realtime.start(userId: userId, sessionId: snapshot.sessionId)
         }
         try await refreshUserData()
+        // First-class mobile bootstrap: if user has no organizations yet, create one and switch
+        try await ensureOrganizationAndActivateIfMissing()
     }
 
     public func organizations() async throws -> [OrganizationSummary] {
@@ -433,11 +476,13 @@ public actor EntityAuthFacade {
     }
 
     public func switchOrg(orgId: String) async throws {
-        let newAccessToken = try await dependencies.organizationService.switchOrg(orgId: orgId)
-        try dependencies.authState.update(accessToken: newAccessToken)
-        snapshot.accessToken = newAccessToken
-        subject.send(snapshot)
-        try await refreshUserData()
+        try await coalesced {
+            let newAccessToken = try await dependencies.organizationService.switchOrg(orgId: orgId)
+            try dependencies.authState.update(accessToken: newAccessToken)
+            snapshot.accessToken = newAccessToken
+            try await refreshUserData()
+            emit()
+        }
     }
 
     public func activeOrganization() async throws -> ActiveOrganization? {
@@ -459,7 +504,7 @@ public actor EntityAuthFacade {
         )
         // UI will update via realtime; optimistic reflect username
         snapshot.username = trimmed
-        subject.send(snapshot)
+        emit()
     }
 
     public func checkUsername(_ value: String) async throws -> UsernameCheckResponse {
@@ -502,7 +547,76 @@ public actor EntityAuthFacade {
         let active = try await dependencies.organizationService.active()?.asDomain
         snapshot.organizations = organizations
         snapshot.activeOrganization = active
-        subject.send(snapshot)
+        emit()
+    }
+
+    // MARK: - Org bootstrap (parity with web)
+    private func ensureOrganizationAndActivateIfMissing() async throws {
+        if !(snapshot.organizations.isEmpty) { return }
+        guard let userId = snapshot.userId else { return }
+        // Derive a base from username or email local-part
+        let identity = try await fetchCurrentUserIdentity()
+        let base: String = {
+            let username = (snapshot.username ?? identity.username ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !username.isEmpty { return username }
+            if let email = identity.email, let local = email.split(separator: "@").first, !local.isEmpty { return String(local) }
+            return "account"
+        }()
+        let orgDisplayName: String = makePossessive(base) + " Org"
+        let baseSlug = makeSlug(base)
+        // Try to create with incrementing slug suffix until success
+        var createdOrgId: String? = nil
+        for attempt in 0..<10 {
+            let candidateSlug = attempt == 0 ? baseSlug : "\(baseSlug)-\(attempt+1)"
+            do {
+                try await createOrganization(name: orgDisplayName, slug: candidateSlug, ownerId: userId)
+                // Refresh and capture id
+                let refreshed = try await dependencies.organizationService.list().map { $0.asDomain }
+                snapshot.organizations = refreshed
+                emit()
+                createdOrgId = (refreshed.first { ($0.slug ?? "") == candidateSlug }?.orgId) ?? refreshed.first?.orgId
+                break
+            } catch {
+                // If duplicate constraint, continue; else rethrow
+                let text = (error as NSError).localizedDescription.lowercased()
+                if text.contains("slug") || text.contains("unique") || text.contains("duplicate") {
+                    continue
+                } else {
+                    throw error
+                }
+            }
+        }
+        if let oid = createdOrgId {
+            try await switchOrg(orgId: oid)
+        }
+    }
+
+    private func makeSlug(_ input: String) -> String {
+        let lowered = input.lowercased()
+        let replaced = lowered
+            .replacingOccurrences(of: "'s", with: "")
+            .replacingOccurrences(of: "&", with: "and")
+            .replacingOccurrences(of: " ", with: "-")
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
+        let filtered = replaced.unicodeScalars.filter { allowed.contains($0) }
+        var result = String(String.UnicodeScalarView(filtered))
+        while result.contains("--") { result = result.replacingOccurrences(of: "--", with: "-") }
+        if result.hasPrefix("-") { result.removeFirst() }
+        if result.hasSuffix("-") { result.removeLast() }
+        return result.isEmpty ? "org" : result
+    }
+
+    private func makePossessive(_ input: String) -> String {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let last = trimmed.last else { return "My" }
+        if last == "s" || last == "S" { return trimmed + "'" }
+        return trimmed + "'s"
+    }
+
+    private func fetchCurrentUserIdentity() async throws -> (email: String?, username: String?) {
+        let req = APIRequest(method: .get, path: "/api/user/me")
+        let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
+        return (email: me.email, username: me.username)
     }
 
     private func handle(event: RealtimeEvent) async {
@@ -517,7 +631,7 @@ public actor EntityAuthFacade {
             snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
             try? authState.clear()
         }
-        subject.send(snapshot)
+        emit()
     }
 }
 
@@ -556,41 +670,52 @@ extension EntityAuthFacade {
         // Prefill last-known userId immediately for seamless UI
         if snapshot.userId == nil, let last = lastUserStore.load() {
             snapshot.userId = last
-            subject.send(snapshot)
+            emit()
         }
         // Eagerly hydrate userId on cold start if tokens are present
         if dependencies.authState.currentTokens.accessToken != nil || dependencies.authState.currentTokens.refreshToken != nil {
-            do {
-                let access = dependencies.authState.currentTokens.accessToken
-                if let access, isAccessTokenExpiringSoon(access) {
-                    let refreshed = try await dependencies.authService.refresh()
-                    try? dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
-                    snapshot.accessToken = refreshed.accessToken
-                    snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
-                    subject.send(snapshot)
-                }
-                let req = APIRequest(method: .get, path: "/api/user/me")
-                let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
-                snapshot.userId = me.id
-                subject.send(snapshot)
-            } catch {
-                _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
-                // If failure indicates expired/invalid access token, attempt one refresh then retry hydration
-                if shouldAttemptRefresh(after: error) {
-                    do {
+            try? await coalesced {
+                do {
+                    let access = dependencies.authState.currentTokens.accessToken
+                    if let access, isAccessTokenExpiringSoon(access) {
                         let refreshed = try await dependencies.authService.refresh()
                         try? dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
                         snapshot.accessToken = refreshed.accessToken
                         snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
-                        subject.send(snapshot)
-                        let req = APIRequest(method: .get, path: "/api/user/me")
-                        let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
-                        snapshot.userId = me.id
-                        subject.send(snapshot)
-                    } catch {
-                        _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
+                    }
+                    let req = APIRequest(method: .get, path: "/api/user/me")
+                    let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
+                    snapshot.userId = me.id
+                } catch {
+                    _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
+                    // If failure indicates expired/invalid access token, attempt one refresh then retry hydration
+                    if shouldAttemptRefresh(after: error) {
+                        do {
+                            let refreshed = try await dependencies.authService.refresh()
+                            try? dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
+                            snapshot.accessToken = refreshed.accessToken
+                            snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
+                            let req = APIRequest(method: .get, path: "/api/user/me")
+                            let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
+                            snapshot.userId = me.id
+                        } catch {
+                            _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
+                        }
                     }
                 }
+                // Ensure org is ready before first emission on cold start
+                try? await refreshUserData()
+                try? await ensureOrganizationAndActivateIfMissing()
+                try? await refreshUserData()
+                // If still no active org but memberships exist, select the first one
+                if snapshot.activeOrganization == nil, let firstOrg = snapshot.organizations.first?.orgId {
+                    if let newToken = try? await dependencies.organizationService.switchOrg(orgId: firstOrg) {
+                        try? dependencies.authState.update(accessToken: newToken)
+                        snapshot.accessToken = newToken
+                        try? await refreshUserData()
+                    }
+                }
+                emit()
             }
         }
     }

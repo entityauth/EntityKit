@@ -50,9 +50,15 @@ private struct AuthOrContent: View {
         Group {
             if isAuthenticated {
                 if let item = selection {
-                    ScrollView { Preview(item: item) }
-                        .padding()
-                        .navigationTitle(item.title)
+                    if item.component == .organizationSwitcher {
+                        Preview(item: item)
+                            .padding()
+                            .navigationTitle(item.title)
+                    } else {
+                        ScrollView { Preview(item: item) }
+                            .padding()
+                            .navigationTitle(item.title)
+                    }
                 } else {
                     ContentUnavailableView("Select a component", systemImage: "square.grid.2x2")
                 }
@@ -100,6 +106,8 @@ private struct Preview: View {
             }
         case .userDisplay:
             UserDisplay(provider: provider)
+        case .organizationSwitcher:
+            OrganizationSwitcherView()
         }
     }
 }

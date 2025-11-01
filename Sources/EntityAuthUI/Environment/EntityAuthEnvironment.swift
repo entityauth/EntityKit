@@ -21,6 +21,9 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _rpId: @Sendable () -> String?
     private let _origins: @Sendable () -> [String]?
     private let _logout: @Sendable () async throws -> Void
+    private let _switchOrg: @Sendable (_ orgId: String) async throws -> Void
+    private let _createOrg: @Sendable (_ name: String, _ slug: String, _ ownerId: String) async throws -> Void
+    private let _activeOrg: @Sendable () async throws -> ActiveOrganization?
 
     public init(
         stream: @escaping @Sendable () async -> AsyncStream<Snapshot>,
@@ -36,7 +39,10 @@ public struct AnyEntityAuthProvider: Sendable {
         passkeySignUp: @escaping @Sendable (_ email: String, _ rpId: String, _ origins: [String]) async throws -> LoginResponse,
         rpId: @escaping @Sendable () -> String?,
         origins: @escaping @Sendable () -> [String]?,
-        logout: @escaping @Sendable () async throws -> Void
+        logout: @escaping @Sendable () async throws -> Void,
+        switchOrg: @escaping @Sendable (_ orgId: String) async throws -> Void,
+        createOrg: @escaping @Sendable (_ name: String, _ slug: String, _ ownerId: String) async throws -> Void,
+        activeOrg: @escaping @Sendable () async throws -> ActiveOrganization?
     ) {
         self._stream = stream
         self._current = current
@@ -52,6 +58,9 @@ public struct AnyEntityAuthProvider: Sendable {
         self._rpId = rpId
         self._origins = origins
         self._logout = logout
+        self._switchOrg = switchOrg
+        self._createOrg = createOrg
+        self._activeOrg = activeOrg
     }
 
     public func snapshotStream() async -> AsyncStream<Snapshot> { await _stream() }
@@ -68,6 +77,9 @@ public struct AnyEntityAuthProvider: Sendable {
     public func rpId() -> String? { _rpId() }
     public func origins() -> [String]? { _origins() }
     public func logout() async throws { try await _logout() }
+    public func switchOrganization(id: String) async throws { try await _switchOrg(id) }
+    public func createOrganization(name: String, slug: String, ownerId: String) async throws { try await _createOrg(name, slug, ownerId) }
+    public func activeOrganization() async throws -> ActiveOrganization? { try await _activeOrg() }
 }
 
 public extension AnyEntityAuthProvider {
@@ -96,7 +108,10 @@ public extension AnyEntityAuthProvider {
             },
             rpId: { config.rpId },
             origins: { config.origins },
-            logout: { try await facade.logout() }
+            logout: { try await facade.logout() },
+            switchOrg: { orgId in try await facade.switchOrg(orgId: orgId) },
+            createOrg: { name, slug, ownerId in try await facade.createOrganization(name: name, slug: slug, ownerId: ownerId) },
+            activeOrg: { try await facade.activeOrganization() }
         )
     }
 
@@ -127,7 +142,10 @@ public extension AnyEntityAuthProvider {
             passkeySignUp: { _, _, _ in throw NSError(domain: "preview", code: -1) },
             rpId: { nil },
             origins: { nil },
-            logout: { }
+            logout: { },
+            switchOrg: { _ in },
+            createOrg: { _, _, _ in },
+            activeOrg: { nil }
         )
     }
 }
