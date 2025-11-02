@@ -99,6 +99,7 @@ private struct UserProfileSheet: View {
     @State private var isEditingAccount: Bool = false
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.profileImageUploader) private var profileImageUploader
 
     var body: some View {
         #if os(iOS)
@@ -598,22 +599,26 @@ private struct UserProfileSheet: View {
     // MARK: - Account Save Handlers
     
     private func saveAccountChanges(name: String, email: String) async {
-        // TODO: Implement actual save logic through provider
-        print("[UserProfile] Saving account changes: name=\(name), email=\(email)")
-        
-        // Simulate save delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        // Exit edit mode on success
-        isEditingAccount = false
+        do {
+            try await provider.setUsername(name)
+            try await provider.setEmail(email)
+            isEditingAccount = false
+        } catch {
+            print("[UserProfile] Failed to save account changes: \(error)")
+        }
     }
     
     private func saveProfileImage(_ imageData: Data) async {
-        // TODO: Implement actual image upload logic through provider
-        print("[UserProfile] Saving profile image: \(imageData.count) bytes")
-        
-        // Simulate upload delay
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard let uploader = profileImageUploader else {
+            print("[UserProfile] No profileImageUploader provided; skipping upload")
+            return
+        }
+        do {
+            let url = try await uploader(imageData)
+            try await provider.setImageUrl(url.absoluteString)
+        } catch {
+            print("[UserProfile] Failed to upload/set profile image: \(error)")
+        }
     }
 }
 
@@ -622,6 +627,7 @@ private struct SectionDetail: View {
     let section: ProfileSection
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.profileImageUploader) private var profileImageUploader
     @Binding var isPresented: Bool
     @State private var isEditingAccount: Bool = false
 
@@ -690,14 +696,26 @@ private struct SectionDetail: View {
     }
     
     private func saveAccountChanges(name: String, email: String) async {
-        print("[SectionDetail] Saving account changes: name=\(name), email=\(email)")
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        isEditingAccount = false
+        do {
+            try await provider.setUsername(name)
+            try await provider.setEmail(email)
+            isEditingAccount = false
+        } catch {
+            print("[SectionDetail] Failed to save account changes: \(error)")
+        }
     }
     
     private func saveProfileImage(_ imageData: Data) async {
-        print("[SectionDetail] Saving profile image: \(imageData.count) bytes")
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard let uploader = profileImageUploader else {
+            print("[SectionDetail] No profileImageUploader provided; skipping upload")
+            return
+        }
+        do {
+            let url = try await uploader(imageData)
+            try await provider.setImageUrl(url.absoluteString)
+        } catch {
+            print("[SectionDetail] Failed to upload/set profile image: \(error)")
+        }
     }
 }
 

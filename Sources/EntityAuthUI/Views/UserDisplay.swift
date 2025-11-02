@@ -104,15 +104,50 @@ public struct UserDisplay: View {
                         .scaleEffect(variant == .avatarOnly ? 0.6 : 0.7)
                 }
         } else {
-            // User avatar with initial
-            ZStack {
-                Circle()
-                    .fill(.blue.gradient)
-                    .frame(width: size, height: size)
-                
-                Text(userInitial(from: output!.name))
-                    .font(.system(avatarFontSize, design: .rounded, weight: .bold))
-                    .foregroundStyle(.white)
+            if let urlString = output!.imageUrl, let url = URL(string: urlString), !urlString.isEmpty {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        Circle()
+                            .fill(.tertiary.opacity(0.5))
+                            .frame(width: size, height: size)
+                            .overlay { ProgressView().scaleEffect(variant == .avatarOnly ? 0.6 : 0.7) }
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size, height: size)
+                            .clipShape(Circle())
+                    case .failure:
+                        ZStack {
+                            Circle()
+                                .fill(.blue.gradient)
+                                .frame(width: size, height: size)
+                            Text(userInitial(from: output!.name))
+                                .font(.system(avatarFontSize, design: .rounded, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    @unknown default:
+                        ZStack {
+                            Circle()
+                                .fill(.blue.gradient)
+                                .frame(width: size, height: size)
+                            Text(userInitial(from: output!.name))
+                                .font(.system(avatarFontSize, design: .rounded, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+            } else {
+                // Fallback to initial
+                ZStack {
+                    Circle()
+                        .fill(.blue.gradient)
+                        .frame(width: size, height: size)
+                    Text(userInitial(from: output!.name))
+                        .font(.system(avatarFontSize, design: .rounded, weight: .bold))
+                        .foregroundStyle(.white)
+                }
             }
         }
     }

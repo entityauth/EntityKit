@@ -24,6 +24,9 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _switchOrg: @Sendable (_ orgId: String) async throws -> Void
     private let _createOrg: @Sendable (_ name: String, _ slug: String, _ ownerId: String) async throws -> Void
     private let _activeOrg: @Sendable () async throws -> ActiveOrganization?
+    private let _setUsername: @Sendable (_ username: String) async throws -> Void
+    private let _setEmail: @Sendable (_ email: String) async throws -> Void
+    private let _setImageUrl: @Sendable (_ imageUrl: String) async throws -> Void
 
     public init(
         stream: @escaping @Sendable () async -> AsyncStream<Snapshot>,
@@ -42,7 +45,10 @@ public struct AnyEntityAuthProvider: Sendable {
         logout: @escaping @Sendable () async throws -> Void,
         switchOrg: @escaping @Sendable (_ orgId: String) async throws -> Void,
         createOrg: @escaping @Sendable (_ name: String, _ slug: String, _ ownerId: String) async throws -> Void,
-        activeOrg: @escaping @Sendable () async throws -> ActiveOrganization?
+        activeOrg: @escaping @Sendable () async throws -> ActiveOrganization?,
+        setUsername: @escaping @Sendable (_ username: String) async throws -> Void,
+        setEmail: @escaping @Sendable (_ email: String) async throws -> Void,
+        setImageUrl: @escaping @Sendable (_ imageUrl: String) async throws -> Void
     ) {
         self._stream = stream
         self._current = current
@@ -61,6 +67,9 @@ public struct AnyEntityAuthProvider: Sendable {
         self._switchOrg = switchOrg
         self._createOrg = createOrg
         self._activeOrg = activeOrg
+        self._setUsername = setUsername
+        self._setEmail = setEmail
+        self._setImageUrl = setImageUrl
     }
 
     public func snapshotStream() async -> AsyncStream<Snapshot> { await _stream() }
@@ -80,6 +89,9 @@ public struct AnyEntityAuthProvider: Sendable {
     public func switchOrganization(id: String) async throws { try await _switchOrg(id) }
     public func createOrganization(name: String, slug: String, ownerId: String) async throws { try await _createOrg(name, slug, ownerId) }
     public func activeOrganization() async throws -> ActiveOrganization? { try await _activeOrg() }
+    public func setUsername(_ username: String) async throws { try await _setUsername(username) }
+    public func setEmail(_ email: String) async throws { try await _setEmail(email) }
+    public func setImageUrl(_ imageUrl: String) async throws { try await _setImageUrl(imageUrl) }
 }
 
 public extension AnyEntityAuthProvider {
@@ -111,7 +123,10 @@ public extension AnyEntityAuthProvider {
             logout: { try await facade.logout() },
             switchOrg: { orgId in try await facade.switchOrg(orgId: orgId) },
             createOrg: { name, slug, ownerId in try await facade.createOrganization(name: name, slug: slug, ownerId: ownerId) },
-            activeOrg: { try await facade.activeOrganization() }
+            activeOrg: { try await facade.activeOrganization() },
+            setUsername: { value in try await facade.setUsername(value) },
+            setEmail: { value in try await facade.setEmail(value) },
+            setImageUrl: { value in try await facade.setImageUrl(value) }
         )
     }
 
@@ -165,7 +180,10 @@ public extension AnyEntityAuthProvider {
             logout: { },
             switchOrg: { id in await state.switchOrg(id: id) },
             createOrg: { _, _, _ in },
-            activeOrg: { await state.activeOrg() }
+            activeOrg: { await state.activeOrg() },
+            setUsername: { _ in },
+            setEmail: { _ in },
+            setImageUrl: { _ in }
         )
     }
 
@@ -230,7 +248,10 @@ public extension AnyEntityAuthProvider {
             logout: { },
             switchOrg: { id in await state.switchOrg(id: id) },
             createOrg: { name, slug, ownerId in await state.createOrg(name: name, slug: slug, ownerId: ownerId) },
-            activeOrg: { await state.activeOrg() }
+            activeOrg: { await state.activeOrg() },
+            setUsername: { _ in },
+            setEmail: { _ in },
+            setImageUrl: { _ in }
         )
     }
 }
@@ -252,4 +273,25 @@ public extension View {
     }
 }
 
+
+// MARK: - Profile Image Upload Adapter
+
+public typealias ProfileImageUploader = @Sendable (_ data: Data) async throws -> URL
+
+private struct ProfileImageUploaderKey: EnvironmentKey {
+    static let defaultValue: ProfileImageUploader? = nil
+}
+
+public extension EnvironmentValues {
+    var profileImageUploader: ProfileImageUploader? {
+        get { self[ProfileImageUploaderKey.self] }
+        set { self[ProfileImageUploaderKey.self] = newValue }
+    }
+}
+
+public extension View {
+    func profileImageUploader(_ uploader: ProfileImageUploader?) -> some View {
+        environment(\.profileImageUploader, uploader)
+    }
+}
 

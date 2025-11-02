@@ -112,6 +112,7 @@ public actor EntityAuthFacade {
         public var userId: String?
         public var username: String?
         public var email: String?
+        public var imageUrl: String?
         public var organizations: [OrganizationSummary]
         public var activeOrganization: ActiveOrganization?
 
@@ -122,6 +123,7 @@ public actor EntityAuthFacade {
             userId: String?,
             username: String?,
             email: String? = nil,
+            imageUrl: String? = nil,
             organizations: [OrganizationSummary],
             activeOrganization: ActiveOrganization?
         ) {
@@ -131,6 +133,7 @@ public actor EntityAuthFacade {
             self.userId = userId
             self.username = username
             self.email = email
+            self.imageUrl = imageUrl
             self.organizations = organizations
             self.activeOrganization = activeOrganization
         }
@@ -162,6 +165,8 @@ public actor EntityAuthFacade {
             sessionId: nil,
             userId: nil,
             username: nil,
+            email: nil,
+            imageUrl: nil,
             organizations: [],
             activeOrganization: nil
         )
@@ -251,7 +256,7 @@ public actor EntityAuthFacade {
     public func logout() async throws {
         try await dependencies.authService.logout(sessionId: snapshot.sessionId, refreshToken: snapshot.refreshToken)
         try authState.clear()
-        snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
+        snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, email: nil, imageUrl: nil, organizations: [], activeOrganization: nil)
         emit()
         await dependencies.realtime.stop()
         lastUserStore.clear()
@@ -261,7 +266,7 @@ public actor EntityAuthFacade {
     /// Useful in development to clear Keychain tokens and local snapshot if state becomes inconsistent.
     public func hardResetLocalAuth() async {
         try? authState.clear()
-        snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, organizations: [], activeOrganization: nil)
+        snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, email: nil, imageUrl: nil, organizations: [], activeOrganization: nil)
         emit()
         await dependencies.realtime.stop()
         lastUserStore.clear()
@@ -387,6 +392,9 @@ public actor EntityAuthFacade {
                 let req = APIRequest(method: .get, path: "/api/user/me")
                 let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
                 snapshot.userId = me.id
+                snapshot.username = me.username
+                snapshot.email = me.email
+                snapshot.imageUrl = me.imageUrl
                 emit()
                 print("[EntityAuth][Bootstrap] resolved userId=\(me.id)")
             } catch {
@@ -534,6 +542,36 @@ public actor EntityAuthFacade {
         )
         // UI will update via realtime; optimistic reflect username
         snapshot.username = trimmed
+        emit()
+    }
+
+    public func setEmail(_ email: String) async throws {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
+        guard let userId = snapshot.userId else { throw EntityAuthError.unauthorized }
+        let _ = try await dependencies.entitiesService.updateEnforced(
+            id: userId,
+            patch: [
+                "properties": ["email": trimmed]
+            ],
+            actorId: userId
+        )
+        snapshot.email = trimmed
+        emit()
+    }
+
+    public func setImageUrl(_ imageUrl: String) async throws {
+        let trimmed = imageUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
+        guard let userId = snapshot.userId else { throw EntityAuthError.unauthorized }
+        let _ = try await dependencies.entitiesService.updateEnforced(
+            id: userId,
+            patch: [
+                "properties": ["imageUrl": trimmed]
+            ],
+            actorId: userId
+        )
+        snapshot.imageUrl = trimmed
         emit()
     }
 
@@ -722,6 +760,26 @@ extension EntityAuthFacade {
         return text.contains("exp") || text.contains("unauthorized")
     }
 
+    // Decode current access token and extract email claim if present
+    private func currentEmailFromAccessToken() -> String? {
+        guard let jwt = snapshot.accessToken else { return nil }
+        let parts = jwt.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        let payloadPart = String(parts[1])
+        func base64urlToData(_ s: String) -> Data? {
+            var str = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            let padding = (4 - (str.count % 4)) % 4
+            if padding > 0 { str.append(String(repeating: "=", count: padding)) }
+            return Data(base64Encoded: str)
+        }
+        guard let data = base64urlToData(payloadPart),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        if let email = json["email"] as? String { return email }
+        if let emails = json["emails"] as? [String], let first = emails.first { return first }
+        return nil
+    }
+
     // Decode current access token and extract organization id claim
     fileprivate func currentActiveOrgIdFromAccessToken() -> String? {
         guard let jwt = snapshot.accessToken else { return nil }
@@ -763,6 +821,9 @@ extension EntityAuthFacade {
                     let req = APIRequest(method: .get, path: "/api/user/me")
                     let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
                     snapshot.userId = me.id
+                    snapshot.username = me.username
+                    snapshot.email = me.email
+                    snapshot.imageUrl = me.imageUrl
                 } catch {
                     _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
                     // If failure indicates expired/invalid access token, attempt one refresh then retry hydration
@@ -775,6 +836,9 @@ extension EntityAuthFacade {
                             let req = APIRequest(method: .get, path: "/api/user/me")
                             let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
                             snapshot.userId = me.id
+                            snapshot.username = me.username
+                            snapshot.email = me.email
+                            snapshot.imageUrl = me.imageUrl
                         } catch {
                             _ = (error as? EntityAuthError)?.errorDescription ?? error.localizedDescription
                         }
@@ -784,6 +848,10 @@ extension EntityAuthFacade {
                 try? await refreshUserData()
                 try? await ensureOrganizationAndActivateIfMissing()
                 try? await refreshUserData()
+                // Backfill email from token if /me returned none
+                if (snapshot.email == nil || snapshot.email?.isEmpty == true), let claimEmail = currentEmailFromAccessToken() {
+                    try? await setEmail(claimEmail)
+                }
                 // If still no active org but memberships exist, select the first one
                 if snapshot.activeOrganization == nil, let firstOrg = snapshot.organizations.first?.orgId {
                     if let newToken = try? await dependencies.organizationService.switchOrg(orgId: firstOrg) {

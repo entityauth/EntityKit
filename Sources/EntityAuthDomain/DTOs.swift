@@ -200,6 +200,7 @@ public struct UserResponse: Decodable, Sendable {
     public let id: String
     public let email: String?
     public let username: String?
+    public let imageUrl: String?
     public let workspaceTenantId: String?
 }
 

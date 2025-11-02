@@ -7,6 +7,7 @@ public final class UserDisplayViewModel: ObservableObject {
     public struct Output: Equatable {
         public var name: String?
         public var email: String?
+        public var imageUrl: String?
         public var isLoading: Bool
     }
 
@@ -17,7 +18,7 @@ public final class UserDisplayViewModel: ObservableObject {
 
     public init(provider: AnyEntityAuthProvider) {
         self.provider = provider
-        self.output = .init(name: nil, email: nil, isLoading: true)
+        self.output = .init(name: nil, email: nil, imageUrl: nil, isLoading: true)
         subscribe()
     }
 
@@ -34,6 +35,7 @@ public final class UserDisplayViewModel: ObservableObject {
                 self.output = .init(
                     name: snap.username,
                     email: snap.email,
+                    imageUrl: snap.imageUrl,
                     isLoading: false
                 )
             }
