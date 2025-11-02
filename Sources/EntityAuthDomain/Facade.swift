@@ -476,17 +476,44 @@ public actor EntityAuthFacade {
     }
 
     public func switchOrg(orgId: String) async throws {
+        print("[EntityAuth][switchOrg] begin orgId=\(orgId)")
         try await coalesced {
             let newAccessToken = try await dependencies.organizationService.switchOrg(orgId: orgId)
+            print("[EntityAuth][switchOrg] received new access token (len=\(newAccessToken.count))")
             try dependencies.authState.update(accessToken: newAccessToken)
             snapshot.accessToken = newAccessToken
+            print("[EntityAuth][switchOrg] refreshing user data...")
             try await refreshUserData()
+            print("[EntityAuth][switchOrg] refresh complete orgs=\(snapshot.organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil")")
             emit()
         }
     }
 
     public func activeOrganization() async throws -> ActiveOrganization? {
-        try await dependencies.organizationService.active()?.asDomain
+        // Source of truth is the access token's `oid` (or `orgId`) claim
+        guard let oid = currentActiveOrgIdFromAccessToken() else { return nil }
+        if let matched = snapshot.organizations.first(where: { $0.orgId == oid }) {
+            return ActiveOrganization(
+                orgId: matched.orgId,
+                name: matched.name,
+                slug: matched.slug,
+                memberCount: matched.memberCount,
+                role: matched.role,
+                joinedAt: matched.joinedAt,
+                workspaceTenantId: matched.workspaceTenantId,
+                description: nil
+            )
+        }
+        return ActiveOrganization(
+            orgId: oid,
+            name: nil,
+            slug: nil,
+            memberCount: nil,
+            role: "",
+            joinedAt: 0,
+            workspaceTenantId: nil,
+            description: nil
+        )
     }
 
     public func setUsername(_ username: String) async throws {
@@ -543,10 +570,37 @@ public actor EntityAuthFacade {
     }
 
     private func refreshUserData() async throws {
+        print("[EntityAuth][refreshUserData] begin")
         let organizations = try await dependencies.organizationService.list().map { $0.asDomain }
-        let active = try await dependencies.organizationService.active()?.asDomain
         snapshot.organizations = organizations
-        snapshot.activeOrganization = active
+        // Derive active org from token `oid` claim
+        let tokenOid = currentActiveOrgIdFromAccessToken()
+        if let oid = tokenOid, let matched = organizations.first(where: { $0.orgId == oid }) {
+            snapshot.activeOrganization = ActiveOrganization(
+                orgId: matched.orgId,
+                name: matched.name,
+                slug: matched.slug,
+                memberCount: matched.memberCount,
+                role: matched.role,
+                joinedAt: matched.joinedAt,
+                workspaceTenantId: matched.workspaceTenantId,
+                description: nil
+            )
+        } else if let oid = tokenOid {
+            snapshot.activeOrganization = ActiveOrganization(
+                orgId: oid,
+                name: nil,
+                slug: nil,
+                memberCount: nil,
+                role: "",
+                joinedAt: 0,
+                workspaceTenantId: nil,
+                description: nil
+            )
+        } else {
+            snapshot.activeOrganization = nil
+        }
+        print("[EntityAuth][refreshUserData] end orgs=\(organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil") (from token oid=\(tokenOid ?? "nil"))")
         emit()
     }
 
@@ -663,6 +717,26 @@ extension EntityAuthFacade {
         // Also for generic decoding/network that mention exp claim
         let text = (error as NSError).localizedDescription.lowercased()
         return text.contains("exp") || text.contains("unauthorized")
+    }
+
+    // Decode current access token and extract organization id claim
+    fileprivate func currentActiveOrgIdFromAccessToken() -> String? {
+        guard let jwt = snapshot.accessToken else { return nil }
+        let parts = jwt.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+        let payloadPart = String(parts[1])
+        func base64urlToData(_ s: String) -> Data? {
+            var str = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            let padding = (4 - (str.count % 4)) % 4
+            if padding > 0 { str.append(String(repeating: "=", count: padding)) }
+            return Data(base64Encoded: str)
+        }
+        guard let data = base64urlToData(payloadPart),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        if let oid = json["oid"] as? String { return oid }
+        if let oid = json["orgId"] as? String { return oid }
+        return nil
     }
     private func initializeAsync() async {
         await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)

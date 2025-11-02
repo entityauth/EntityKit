@@ -1,4 +1,5 @@
 import SwiftUI
+import EntityAuthDomain
 
 public struct SandboxRootView: View {
     @State private var query: String = ""
@@ -9,9 +10,14 @@ public struct SandboxRootView: View {
     
     /// Convenience initializer that sets up the sandbox with mock auth provider
     public static func withMockAuth() -> some View {
-        SandboxRootView()
+        let orgs: [OrganizationSummary] = [
+            OrganizationSummary(orgId: "org_acme", name: "Acme Inc.", slug: "acme", memberCount: 12, role: "owner", joinedAt: Date().addingTimeInterval(-86400 * 400).timeIntervalSince1970, workspaceTenantId: "demo"),
+            OrganizationSummary(orgId: "org_umbrella", name: "Umbrella", slug: "umbrella", memberCount: 5, role: "member", joinedAt: Date().addingTimeInterval(-86400 * 200).timeIntervalSince1970, workspaceTenantId: "demo"),
+            OrganizationSummary(orgId: "org_wayne", name: "Wayne Enterprises", slug: "wayne", memberCount: 28, role: "member", joinedAt: Date().addingTimeInterval(-86400 * 30).timeIntervalSince1970, workspaceTenantId: "demo")
+        ]
+        return SandboxRootView()
             .entityTheme(.default)
-            .entityAuthProvider(.preview(name: "John Appleseed", email: "john@example.com"))
+            .entityAuthProvider(.preview(name: "John Appleseed", email: "john@example.com", organizations: orgs, activeOrgId: "org_acme"))
     }
 
     public var body: some View {
@@ -85,6 +91,8 @@ private struct Preview: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var errorText: String?
+    @State private var showOrgSheet: Bool = false
+    @State private var showOrgPopover: Bool = false
 
     var body: some View {
         switch item.component {
@@ -107,7 +115,40 @@ private struct Preview: View {
         case .userDisplay:
             UserDisplay(provider: provider)
         case .organizationSwitcher:
+            VStack(alignment: .leading, spacing: 16) {
+                // Inline preview
+                Text("Inline component").font(.caption).foregroundStyle(.secondary)
+                OrganizationSwitcherView()
+
+                // iOS: Presentation sheet demo
+                #if os(iOS)
+                Divider()
+                Text("iOS presentation sheet").font(.caption).foregroundStyle(.secondary)
+                Button("My Organizations") { showOrgSheet = true }
+                    .buttonStyle(.borderedProminent)
+                    .sheet(isPresented: $showOrgSheet) {
+                        NavigationStack {
+                            OrganizationSwitcherView()
+                                .navigationTitle("My Organizations")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .padding()
+                        }
+                    }
+                #endif
+
+                // macOS: Popover-style menu demo
+                #if os(macOS)
+                Divider()
+                Text("macOS menu (popover)").font(.caption).foregroundStyle(.secondary)
+                Button("My Organizations") { showOrgPopover = true }
+                    .buttonStyle(.borderedProminent)
+                    .popover(isPresented: $showOrgPopover, arrowEdge: .bottom) {
             OrganizationSwitcherView()
+                            .frame(width: 420, height: 520)
+                            .padding()
+                    }
+                #endif
+            }
         }
     }
 }

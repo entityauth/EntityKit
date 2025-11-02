@@ -119,19 +119,38 @@ public extension AnyEntityAuthProvider {
         name: String = "Entity User",
         email: String = "user@example.com"
     ) -> AnyEntityAuthProvider {
-        let snapshot = EntityAuthFacade.Snapshot(
+        let orgs: [OrganizationSummary] = []
+        actor State: Sendable {
+            var orgs: [OrganizationSummary]
+            var activeId: String?
+            var snapshot: EntityAuthFacade.Snapshot
+            init(orgs: [OrganizationSummary], activeId: String?, snapshot: EntityAuthFacade.Snapshot) {
+                self.orgs = orgs
+                self.activeId = activeId
+                self.snapshot = snapshot
+            }
+            func current() -> EntityAuthFacade.Snapshot { snapshot }
+            func organizations() -> [OrganizationSummary] { orgs }
+            func switchOrg(id: String) { activeId = id }
+            func activeOrg() -> ActiveOrganization? {
+                guard let id = activeId, let found = orgs.first(where: { $0.orgId == id }) else { return nil }
+                return ActiveOrganization(orgId: found.orgId, name: found.name, slug: found.slug, memberCount: found.memberCount, role: found.role, joinedAt: found.joinedAt, workspaceTenantId: found.workspaceTenantId, description: nil)
+            }
+        }
+        let initialSnapshot = EntityAuthFacade.Snapshot(
             accessToken: nil,
             refreshToken: nil,
             sessionId: nil,
             userId: "user_123",
             username: name,
-            organizations: [],
+            organizations: orgs,
             activeOrganization: nil
         )
+        let state = State(orgs: orgs, activeId: nil, snapshot: initialSnapshot)
         return AnyEntityAuthProvider(
-            stream: { AsyncStream { continuation in continuation.yield(snapshot) } },
-            current: { snapshot },
-            organizations: { [] },
+            stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap) } } },
+            current: { await state.current() },
+            organizations: { try await state.organizations() },
             baseURL: { URL(string: "https://example.com")! },
             tenantId: { nil },
             ssoCallbackURL: { nil },
@@ -143,9 +162,73 @@ public extension AnyEntityAuthProvider {
             rpId: { nil },
             origins: { nil },
             logout: { },
-            switchOrg: { _ in },
+            switchOrg: { id in await state.switchOrg(id: id) },
             createOrg: { _, _, _ in },
-            activeOrg: { nil }
+            activeOrg: { await state.activeOrg() }
+        )
+    }
+
+    static func preview(
+        name: String = "Entity User",
+        email: String = "user@example.com",
+        organizations orgs: [OrganizationSummary],
+        activeOrgId: String?
+    ) -> AnyEntityAuthProvider {
+        actor State: Sendable {
+            var orgs: [OrganizationSummary]
+            var activeId: String?
+            var snapshot: EntityAuthFacade.Snapshot
+            init(orgs: [OrganizationSummary], activeId: String?, snapshot: EntityAuthFacade.Snapshot) {
+                self.orgs = orgs
+                self.activeId = activeId
+                self.snapshot = snapshot
+            }
+            func current() -> EntityAuthFacade.Snapshot { snapshot }
+            func organizations() -> [OrganizationSummary] { orgs }
+            func switchOrg(id: String) { activeId = id }
+            func createOrg(name: String, slug: String, ownerId: String) {
+                let now = Date().timeIntervalSince1970
+                let new = OrganizationSummary(orgId: "org_\(Int.random(in: 1000...9999))", name: name, slug: slug, memberCount: 1, role: "owner", joinedAt: now, workspaceTenantId: nil)
+                orgs.insert(new, at: 0)
+                activeId = new.orgId
+            }
+            func activeOrg() -> ActiveOrganization? {
+                guard let id = activeId, let found = orgs.first(where: { $0.orgId == id }) else { return nil }
+                return ActiveOrganization(orgId: found.orgId, name: found.name, slug: found.slug, memberCount: found.memberCount, role: found.role, joinedAt: found.joinedAt, workspaceTenantId: found.workspaceTenantId, description: nil)
+            }
+        }
+        let initialSnapshot = EntityAuthFacade.Snapshot(
+            accessToken: nil,
+            refreshToken: nil,
+            sessionId: nil,
+            userId: "user_123",
+            username: name,
+            organizations: orgs,
+            activeOrganization: activeOrgId.flatMap { id in
+                orgs.first(where: { $0.orgId == id }).map { o in
+                    ActiveOrganization(orgId: o.orgId, name: o.name, slug: o.slug, memberCount: o.memberCount, role: o.role, joinedAt: o.joinedAt, workspaceTenantId: o.workspaceTenantId, description: nil)
+                }
+            }
+        )
+        let state = State(orgs: orgs, activeId: activeOrgId, snapshot: initialSnapshot)
+        return AnyEntityAuthProvider(
+            stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap) } } },
+            current: { await state.current() },
+            organizations: { try await state.organizations() },
+            baseURL: { URL(string: "https://example.com")! },
+            tenantId: { nil },
+            ssoCallbackURL: { nil },
+            applyTokens: { _, _, _, _ in },
+            login: { _ in },
+            register: { _ in },
+            passkeySignIn: { _, _ in throw NSError(domain: "preview", code: -1) },
+            passkeySignUp: { _, _, _ in throw NSError(domain: "preview", code: -1) },
+            rpId: { nil },
+            origins: { nil },
+            logout: { },
+            switchOrg: { id in await state.switchOrg(id: id) },
+            createOrg: { name, slug, ownerId in await state.createOrg(name: name, slug: slug, ownerId: ownerId) },
+            activeOrg: { await state.activeOrg() }
         )
     }
 }
