@@ -48,9 +48,8 @@ public struct UserProfileToolbarButton: View {
             case .icon:
                 Image("User", bundle: .module)
                     .resizable()
-                    .renderingMode(.template)
+                    .renderingMode(.original)
                     .frame(width: 28, height: 28)
-                    .foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.plain)
@@ -227,7 +226,7 @@ private struct UserProfileSheet: View {
                     HStack(spacing: 10) {
                         Image(section.iconName, bundle: .module)
                             .resizable()
-                            .renderingMode(.template)
+                            .renderingMode(.original)
                             .frame(width: 16, height: 16)
                         Text(section.title)
                             .font(.system(.subheadline, design: .rounded, weight: selected == section ? .semibold : .medium))
@@ -268,7 +267,7 @@ private struct UserProfileSheet: View {
                 HStack(spacing: 10) {
                     Image("PowerOff", bundle: .module)
                         .resizable()
-                        .renderingMode(.template)
+                        .renderingMode(.original)
                         .frame(width: 16, height: 16)
                     Text("Sign out")
                         .font(.system(.subheadline, design: .rounded, weight: .medium))
@@ -501,9 +500,8 @@ private struct UserProfileSheet: View {
                 HStack(spacing: 12) {
                     Image(section.iconName, bundle: .module)
                         .resizable()
-                        .renderingMode(.template)
+                        .renderingMode(.original)
                         .frame(width: 20, height: 20)
-                        .foregroundStyle(.primary)
                     
                     Text(section.title)
                         .font(.system(.body, design: .rounded, weight: .semibold))
@@ -562,9 +560,8 @@ private struct UserProfileSheet: View {
             HStack(spacing: 12) {
                 Image("PowerOff", bundle: .module)
                     .resizable()
-                    .renderingMode(.template)
+                    .renderingMode(.original)
                     .frame(width: 18, height: 18)
-                    .foregroundStyle(.white)
                 
                 Text("Sign out")
                     .font(.system(.body, design: .rounded, weight: .semibold))
@@ -845,9 +842,8 @@ private struct DeleteAccountContent: View {
                 HStack(spacing: 12) {
                     Image("DeleteX", bundle: .module)
                         .resizable()
-                        .renderingMode(.template)
+                        .renderingMode(.original)
                         .frame(width: 18, height: 18)
-                        .foregroundStyle(.white)
                     
                     Text("Delete My Account")
                         .font(.system(.body, design: .rounded, weight: .semibold))
@@ -961,9 +957,8 @@ private struct InvitationsContent: View {
                 
                 Image("PaperPlace", bundle: .module)
                     .resizable()
-                    .renderingMode(.template)
+                    .renderingMode(.original)
                     .frame(width: 36, height: 36)
-                    .foregroundStyle(Color.accentColor.opacity(0.7))
             }
             
             // Text
