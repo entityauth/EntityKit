@@ -37,8 +37,8 @@ public let componentRegistry: [ComponentItem] = [
     .init(
         title: "User Display",
         slug: ["user", "display"],
-        description: "Compact identity display",
-        keywords: ["user", "identity"],
+        description: "Modern user identity components with Liquid Glass design - display variants and interactive buttons",
+        keywords: ["user", "identity", "avatar", "button", "profile"],
         group: "Core",
         component: .userDisplay
     )

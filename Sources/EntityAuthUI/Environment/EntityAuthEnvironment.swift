@@ -143,6 +143,7 @@ public extension AnyEntityAuthProvider {
             sessionId: nil,
             userId: "user_123",
             username: name,
+            email: email,
             organizations: orgs,
             activeOrganization: nil
         )
@@ -203,6 +204,7 @@ public extension AnyEntityAuthProvider {
             sessionId: nil,
             userId: "user_123",
             username: name,
+            email: email,
             organizations: orgs,
             activeOrganization: activeOrgId.flatMap { id in
                 orgs.first(where: { $0.orgId == id }).map { o in

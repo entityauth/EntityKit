@@ -111,6 +111,7 @@ public actor EntityAuthFacade {
         public var sessionId: String?
         public var userId: String?
         public var username: String?
+        public var email: String?
         public var organizations: [OrganizationSummary]
         public var activeOrganization: ActiveOrganization?
 
@@ -120,6 +121,7 @@ public actor EntityAuthFacade {
             sessionId: String?,
             userId: String?,
             username: String?,
+            email: String? = nil,
             organizations: [OrganizationSummary],
             activeOrganization: ActiveOrganization?
         ) {
@@ -128,6 +130,7 @@ public actor EntityAuthFacade {
             self.sessionId = sessionId
             self.userId = userId
             self.username = username
+            self.email = email
             self.organizations = organizations
             self.activeOrganization = activeOrganization
         }

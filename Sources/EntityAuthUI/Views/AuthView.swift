@@ -126,37 +126,36 @@ public struct AuthView: View {
     // MARK: - Embedded Variant View
     
     private var embeddedVariantView: some View {
-        HStack {
+        #if os(iOS)
+        let maxWidth: CGFloat = 380
+        #else
+        let maxWidth: CGFloat = 448
+        #endif
+        
+        return HStack {
             Spacer()
             VStack(spacing: 24) {
                 // Header - OUTSIDE the card
                 VStack(spacing: 8) {
                     // Entity Auth branding
                     Text("Entity Auth")
-                        .font(.largeTitle)
-                        .bold()
-                    
-                    Text(selectedAuthTab == .signIn ? "Sign in to your dashboard" : "Create account")
-                        .foregroundStyle(.secondary)
+                        .font(.system(.title, design: .rounded, weight: .semibold))
                     
                     if let errorText {
                         Text(errorText)
+                            .font(.system(.caption, design: .rounded))
                             .foregroundStyle(.red)
-                            .font(.footnote)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
                 }
-                .frame(maxWidth: 448)
+                .frame(maxWidth: maxWidth)
                 
                 // Card - Contains Tab Picker and Forms
                 VStack(spacing: 0) {
                     // Tab Picker
-                    Picker("", selection: $selectedAuthTab) {
-                        Text("Sign in").tag(AuthTab.signIn)
-                        Text("Create account").tag(AuthTab.register)
-                    }
-                    .pickerStyle(.segmented)
+                    CustomTabPicker(selection: $selectedAuthTab)
+                        .padding(.bottom, 4)
                     
                     if selectedAuthTab == .signIn {
                         signInView
@@ -166,29 +165,37 @@ public struct AuthView: View {
                 }
                 .padding(24)
                 .background(
-                    ConcentricRectangle()
-                        .fill(.regularMaterial)
-                )
-                .clipShape(ConcentricRectangle())
-                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
-                .containerShape(.rect(cornerRadius: theme.design.cornerRadius))
-                .frame(maxWidth: 448)
-                
-                // Back link - OUTSIDE the card
-                Button(action: {
-                    // Navigation could be added here if needed
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.left")
-                        Text("Back to Entity Auth")
+                    Group {
+                        #if os(iOS)
+                        if #available(iOS 26.0, *) {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.regularMaterial)
+                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
+                        } else {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.ultraThinMaterial)
+                        }
+                        #elseif os(macOS)
+                        if #available(macOS 15.0, *) {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.regularMaterial)
+                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
+                        } else {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.ultraThinMaterial)
+                        }
+                        #else
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(.ultraThinMaterial)
+                        #endif
                     }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: 448)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+                .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 4)
+                .frame(maxWidth: maxWidth)
             }
-            .frame(maxWidth: 448)
+            .frame(maxWidth: maxWidth)
+            .padding(.horizontal, 24)
             Spacer()
         }
     }
@@ -201,36 +208,42 @@ public struct AuthView: View {
             
             // Modal trigger button with Liquid Glass styling
             Button(action: { isModalPresented = true }) {
-                let base = Text("Sign in")
-                    .font(.headline)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(minWidth: 120)
-                
-                #if os(iOS)
-                if #available(iOS 26.0, *) {
-                    base
-                        .glassEffect(.regular.interactive(true), in: .capsule)
-                } else {
-                    base
-                        .background(Capsule().fill(.ultraThinMaterial))
-                        .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 10)
-                }
-                #elseif os(macOS)
-                if #available(macOS 15.0, *) {
-                    base
-                        .glassEffect(.regular.interactive(true), in: .capsule)
-                } else {
-                    base
-                        .background(Capsule().fill(.ultraThinMaterial))
-                        .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.25), radius: 16, x: 0, y: 10)
-                }
-                #else
-                base
-                    .background(Capsule().fill(.ultraThinMaterial))
-                #endif
+                Text("Sign in")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .frame(minWidth: 140)
+                    .background(
+                        Group {
+                            #if os(iOS)
+                            if #available(iOS 26.0, *) {
+                                Capsule()
+                                    .fill(.regularMaterial)
+                                    .glassEffect(.regular.interactive(true), in: .capsule)
+                            } else {
+                                Capsule()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 1))
+                                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                            }
+                            #elseif os(macOS)
+                            if #available(macOS 15.0, *) {
+                                Capsule()
+                                    .fill(.regularMaterial)
+                                    .glassEffect(.regular.interactive(true), in: .capsule)
+                            } else {
+                                Capsule()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.10), lineWidth: 1))
+                                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                            }
+                            #else
+                            Capsule()
+                                .fill(.ultraThinMaterial)
+                            #endif
+                        }
+                    )
             }
             .buttonStyle(.plain)
             
@@ -246,25 +259,42 @@ public struct AuthView: View {
         NavigationView {
             embeddedAuthForm
                 .padding()
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { isModalPresented = false }
-                    }
-                }
+                .navigationTitle("Entity Auth")
+                .navigationBarTitleDisplayMode(.inline)
         }
         .modifier(IOSSheetDetents())
         #else
         VStack(spacing: 0) {
+            // Navigation-style header
             HStack {
                 Spacer()
-                Button("Close") { isModalPresented = false }
+                Text("Entity Auth")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                Spacer()
             }
-            .padding([.top, .horizontal])
+            .overlay(alignment: .trailing) {
+                Button {
+                    isModalPresented = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
             
             embeddedAuthForm
                 .padding(.horizontal)
         }
         .padding(.bottom)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.regularMaterial)
+                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 20))
+        }
         .presentationSizing(.fitted)
         #endif
     }
@@ -272,33 +302,28 @@ public struct AuthView: View {
     // MARK: - Embedded Auth Form (for modal)
     
     private var embeddedAuthForm: some View {
-        VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 8) {
-                Text("Entity Auth")
-                    .font(.largeTitle)
-                    .bold()
-                
-                Text(selectedAuthTab == .signIn ? "Sign in to your dashboard" : "Create account")
-                    .foregroundStyle(.secondary)
-                
-                if let errorText {
-                    Text(errorText)
-                        .foregroundStyle(.red)
-                        .font(.footnote)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
+        #if os(iOS)
+        let idealWidth: CGFloat = 380
+        #else
+        let idealWidth: CGFloat = 480
+        #endif
+        
+        return VStack(spacing: 0) {
+            // Header (error only in modal, title shown in navigation)
+            if let errorText {
+                Text(errorText)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                    .padding(.bottom, 24)
             }
             
             // Card - Contains Tab Picker and Forms
             VStack(spacing: 0) {
                 // Tab Picker
-                Picker("", selection: $selectedAuthTab) {
-                    Text("Sign in").tag(AuthTab.signIn)
-                    Text("Create account").tag(AuthTab.register)
-                }
-                .pickerStyle(.segmented)
+                CustomTabPicker(selection: $selectedAuthTab)
+                    .padding(.bottom, 4)
                 
                 if selectedAuthTab == .signIn {
                     signInView
@@ -308,27 +333,35 @@ public struct AuthView: View {
             }
             .padding(24)
             .background(
-                ConcentricRectangle()
-                    .fill(.regularMaterial)
-            )
-            .clipShape(ConcentricRectangle())
-            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
-            .containerShape(.rect(cornerRadius: theme.design.cornerRadius))
-            
-            // Back link
-            Button(action: {
-                // Navigation could be added here if needed
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.left")
-                    Text("Back to Entity Auth")
+                Group {
+                    #if os(iOS)
+                    if #available(iOS 26.0, *) {
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
+                    } else {
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(.ultraThinMaterial)
+                    }
+                    #elseif os(macOS)
+                    if #available(macOS 15.0, *) {
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
+                    } else {
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(.ultraThinMaterial)
+                    }
+                    #else
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(.ultraThinMaterial)
+                    #endif
                 }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 4)
         }
-        .frame(idealWidth: 480)
+        .frame(idealWidth: idealWidth)
         .padding()
     }
     
@@ -337,18 +370,19 @@ public struct AuthView: View {
     private var signInView: some View {
         VStack(spacing: 16) {
             Spacer()
-                .frame(height: 8)
+                .frame(height: 4)
             
             VStack(spacing: 12) {
             // Email/Password Form
             #if os(iOS)
             TextField("Email", text: $email)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .font(.system(.body, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                        .fill(Color(.systemGray6))
                 )
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
@@ -356,22 +390,31 @@ public struct AuthView: View {
             #else
             TextField("Email", text: $email)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .font(.system(.body, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                        .fill(Color(.systemGray).opacity(0.1))
                 )
                 .disabled(isLoading)
             #endif
             
             SecureField("Password", text: $password)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .font(.system(.body, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
-                    Capsule()
-                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                    Group {
+                        #if os(iOS)
+                        Capsule()
+                            .fill(Color(.systemGray6))
+                        #else
+                        Capsule()
+                            .fill(Color(.systemGray).opacity(0.1))
+                        #endif
+                    }
                 )
                 .disabled(isLoading)
             
@@ -386,21 +429,47 @@ public struct AuthView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 10)
                 } else {
                     Text("Sign in")
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 10)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .clipShape(.capsule)
+            .background(
+                Group {
+                    #if os(iOS)
+                    if #available(iOS 26.0, *) {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                    }
+                    #elseif os(macOS)
+                    if #available(macOS 15.0, *) {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                    }
+                    #else
+                    Capsule()
+                        .fill(theme.colors.primary.gradient)
+                    #endif
+                }
+            )
+            .buttonStyle(.plain)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
-            .tint(theme.colors.primary)
+            .opacity((email.isEmpty || password.isEmpty || isLoading) ? 0.5 : 1.0)
             
             // SSO & Passkey Buttons (icon-only in a row)
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Button(action: {
                     let action = onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText)
                     Task {
@@ -412,14 +481,39 @@ public struct AuthView: View {
                     Image("Google", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 12)
+                        .background(
+                            Group {
+                                #if os(iOS)
+                                if #available(iOS 26.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                }
+                                #elseif os(macOS)
+                                if #available(macOS 15.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray).opacity(0.1))
+                                }
+                                #else
+                                Capsule()
+                                    .fill(Color(.systemGray6))
+                                #endif
+                            }
+                        )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .clipShape(.capsule)
+                .buttonStyle(.plain)
                 .disabled(isLoading)
+                .opacity(isLoading ? 0.5 : 1.0)
                 
                 Button(action: {
                     let action = onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText)
@@ -429,17 +523,42 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image("GithubLight", bundle: .module)
+                    Image("Github", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 12)
+                        .background(
+                            Group {
+                                #if os(iOS)
+                                if #available(iOS 26.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                }
+                                #elseif os(macOS)
+                                if #available(macOS 15.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray).opacity(0.1))
+                                }
+                                #else
+                                Capsule()
+                                    .fill(Color(.systemGray6))
+                                #endif
+                            }
+                        )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .clipShape(.capsule)
+                .buttonStyle(.plain)
                 .disabled(isLoading)
+                .opacity(isLoading ? 0.5 : 1.0)
                 
                 Button(action: {
                     let action = onPasskeySignIn ?? AuthDefaultActions.makePasskeySignIn(provider: provider, errorText: $errorText)
@@ -449,17 +568,42 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight", bundle: .module)
+                    Image("Passkey", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 12)
+                        .background(
+                            Group {
+                                #if os(iOS)
+                                if #available(iOS 26.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                }
+                                #elseif os(macOS)
+                                if #available(macOS 15.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray).opacity(0.1))
+                                }
+                                #else
+                                Capsule()
+                                    .fill(Color(.systemGray6))
+                                #endif
+                            }
+                        )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .clipShape(.capsule)
+                .buttonStyle(.plain)
                 .disabled(isLoading)
+                .opacity(isLoading ? 0.5 : 1.0)
             }
             }
         }
@@ -470,18 +614,19 @@ public struct AuthView: View {
     private var registerView: some View {
         VStack(spacing: 16) {
             Spacer()
-                .frame(height: 8)
+                .frame(height: 4)
             
             VStack(spacing: 12) {
             // Email/Password Form
             #if os(iOS)
             TextField("Email", text: $email)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .font(.system(.body, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                        .fill(Color(.systemGray6))
                 )
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
@@ -489,22 +634,31 @@ public struct AuthView: View {
             #else
             TextField("Email", text: $email)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .font(.system(.body, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                        .fill(Color(.systemGray).opacity(0.1))
                 )
                 .disabled(isLoading)
             #endif
             
             SecureField("Password", text: $password)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .font(.system(.body, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
-                    Capsule()
-                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                    Group {
+                        #if os(iOS)
+                        Capsule()
+                            .fill(Color(.systemGray6))
+                        #else
+                        Capsule()
+                            .fill(Color(.systemGray).opacity(0.1))
+                        #endif
+                    }
                 )
                 .disabled(isLoading)
             
@@ -519,21 +673,47 @@ public struct AuthView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 10)
                 } else {
                     Text("Create account")
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 10)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .clipShape(.capsule)
+            .background(
+                Group {
+                    #if os(iOS)
+                    if #available(iOS 26.0, *) {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                    }
+                    #elseif os(macOS)
+                    if #available(macOS 15.0, *) {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                    }
+                    #else
+                    Capsule()
+                        .fill(theme.colors.primary.gradient)
+                    #endif
+                }
+            )
+            .buttonStyle(.plain)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
-            .tint(theme.colors.primary)
+            .opacity((email.isEmpty || password.isEmpty || isLoading) ? 0.5 : 1.0)
             
             // SSO & Passkey Buttons (icon-only in a row)
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Button(action: {
                     let action = onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText)
                     Task {
@@ -545,14 +725,39 @@ public struct AuthView: View {
                     Image("Google", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 12)
+                        .background(
+                            Group {
+                                #if os(iOS)
+                                if #available(iOS 26.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                }
+                                #elseif os(macOS)
+                                if #available(macOS 15.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray).opacity(0.1))
+                                }
+                                #else
+                                Capsule()
+                                    .fill(Color(.systemGray6))
+                                #endif
+                            }
+                        )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .clipShape(.capsule)
+                .buttonStyle(.plain)
                 .disabled(isLoading)
+                .opacity(isLoading ? 0.5 : 1.0)
                 
                 Button(action: {
                     let action = onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText)
@@ -562,32 +767,82 @@ public struct AuthView: View {
                         isLoading = false
                     }
                 }) {
-                    Image("GithubLight", bundle: .module)
+                    Image("Github", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 12)
+                        .background(
+                            Group {
+                                #if os(iOS)
+                                if #available(iOS 26.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                }
+                                #elseif os(macOS)
+                                if #available(macOS 15.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray).opacity(0.1))
+                                }
+                                #else
+                                Capsule()
+                                    .fill(Color(.systemGray6))
+                                #endif
+                            }
+                        )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .clipShape(.capsule)
+                .buttonStyle(.plain)
                 .disabled(isLoading)
+                .opacity(isLoading ? 0.5 : 1.0)
                 
                 Button(action: {
                     showPasskeySignUpSheet = true
                 }) {
-                    Image(colorScheme == .dark ? "PasskeyDark" : "PasskeyLight", bundle: .module)
+                    Image("Passkey", bundle: .module)
                         .resizable()
                         .renderingMode(.original)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 12)
+                        .background(
+                            Group {
+                                #if os(iOS)
+                                if #available(iOS 26.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray6))
+                                }
+                                #elseif os(macOS)
+                                if #available(macOS 15.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                } else {
+                                    Capsule()
+                                        .fill(Color(.systemGray).opacity(0.1))
+                                }
+                                #else
+                                Capsule()
+                                    .fill(Color(.systemGray6))
+                                #endif
+                            }
+                        )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .clipShape(.capsule)
+                .buttonStyle(.plain)
                 .disabled(isLoading)
+                .opacity(isLoading ? 0.5 : 1.0)
             }
             }
         }
@@ -597,29 +852,32 @@ public struct AuthView: View {
     
     private var passkeySignUpSheet: some View {
         NavigationView {
-            VStack(spacing: 16) {
+            VStack(spacing: 20) {
                 Text("Sign up with Passkey")
-                    .font(.headline)
+                    .font(.system(.title2, design: .rounded, weight: .semibold))
+                    .padding(.top, 8)
                 
                 #if os(iOS)
                 TextField("Email", text: $passkeySignUpEmail)
                     .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .font(.system(.body, design: .rounded))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .background(
                         Capsule()
-                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                            .fill(Color(.systemGray6))
                     )
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
                 #else
                 TextField("Email", text: $passkeySignUpEmail)
                     .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .font(.system(.body, design: .rounded))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .background(
                         Capsule()
-                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                            .fill(Color(.systemGray).opacity(0.1))
                     )
                 #endif
                 
@@ -634,17 +892,45 @@ public struct AuthView: View {
                 }) {
                     if isLoading {
                         ProgressView()
-                        .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
                     } else {
                         Text("Confirm")
+                            .font(.system(.body, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                            .padding(.vertical, 10)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-                .clipShape(.capsule)
+                .background(
+                    Group {
+                        #if os(iOS)
+                        if #available(iOS 26.0, *) {
+                            Capsule()
+                                .fill(theme.colors.primary.gradient)
+                                .glassEffect(.regular.interactive(true), in: .capsule)
+                        } else {
+                            Capsule()
+                                .fill(theme.colors.primary.gradient)
+                        }
+                        #elseif os(macOS)
+                        if #available(macOS 15.0, *) {
+                            Capsule()
+                                .fill(theme.colors.primary.gradient)
+                                .glassEffect(.regular.interactive(true), in: .capsule)
+                        } else {
+                            Capsule()
+                                .fill(theme.colors.primary.gradient)
+                        }
+                        #else
+                        Capsule()
+                            .fill(theme.colors.primary.gradient)
+                        #endif
+                    }
+                )
+                .buttonStyle(.plain)
                 .disabled(passkeySignUpEmail.isEmpty || isLoading)
+                .opacity((passkeySignUpEmail.isEmpty || isLoading) ? 0.5 : 1.0)
                 
                 Spacer()
             }
@@ -657,6 +943,64 @@ public struct AuthView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// MARK: - Custom Tab Picker
+
+/// Custom tab picker that mimics the toolbar variant switcher style using Liquid Glass
+private struct CustomTabPicker: View {
+    @Binding var selection: AuthView.AuthTab
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Sign In Tab
+            Button(action: { 
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selection = .signIn 
+                }
+            }) {
+                Text("Sign in")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(selection == .signIn ? Color.primary : Color.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+            .background {
+                if selection == .signIn {
+                    Capsule()
+                        .fill(.regularMaterial)
+                        .glassEffect(.regular.interactive(true), in: .capsule)
+                }
+            }
+            
+            // Create Account Tab
+            Button(action: { 
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selection = .register 
+                }
+            }) {
+                Text("Create account")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(selection == .register ? Color.primary : Color.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+            .background {
+                if selection == .register {
+                    Capsule()
+                        .fill(.regularMaterial)
+                        .glassEffect(.regular.interactive(true), in: .capsule)
+                }
+            }
+        }
+        .padding(2)
+        .background {
+            Capsule()
+                .fill(.tertiary.opacity(0.5))
         }
     }
 }

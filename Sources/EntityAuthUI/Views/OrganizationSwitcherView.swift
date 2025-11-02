@@ -70,65 +70,71 @@ public struct OrganizationSwitcherView: View {
     // MARK: - List Variant View
     
     private var listVariantView: some View {
-        List {
-            if let error = error {
-                Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
+        GeometryReader { geometry in
+            List {
+                if let error = error {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                }
+                ForEach(organizations, id: \.orgId) { org in
+                    organizationRow(org: org)
+                        #if os(iOS)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                        #endif
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(
+                            Group {
+                                #if os(iOS)
+                                if #available(iOS 26.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 3)
+                                } else {
+                                    Capsule()
+                                        .fill(.ultraThinMaterial)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 3)
+                                }
+                                #elseif os(macOS)
+                                if #available(macOS 15.0, *) {
+                                    Capsule()
+                                        .fill(.regularMaterial)
+                                        .glassEffect(.regular.interactive(true), in: .capsule)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 3)
+                                } else {
+                                    Capsule()
+                                        .fill(.ultraThinMaterial)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 3)
+                                }
+                                #else
+                                Capsule()
+                                    .fill(.ultraThinMaterial)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 3)
+                                #endif
+                            }
+                        )
                 }
             }
-            ForEach(organizations, id: \.orgId) { org in
-                organizationRow(org: org)
-                    #if os(iOS)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                    #endif
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(
-                        Group {
-                            #if os(iOS)
-                            if #available(iOS 26.0, *) {
-                                Capsule()
-                                    .fill(.regularMaterial)
-                                    .glassEffect(.regular.interactive(true), in: .capsule)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 3)
-                            } else {
-                                Capsule()
-                                    .fill(.ultraThinMaterial)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 3)
-                            }
-                            #elseif os(macOS)
-                            if #available(macOS 15.0, *) {
-                                Capsule()
-                                    .fill(.regularMaterial)
-                                    .glassEffect(.regular.interactive(true), in: .capsule)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 3)
-                            } else {
-                                Capsule()
-                                    .fill(.ultraThinMaterial)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 3)
-                            }
-                            #else
-                            Capsule()
-                                .fill(.ultraThinMaterial)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 3)
-                            #endif
-                        }
-                    )
-            }
+            #if os(iOS)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .frame(maxWidth: min(geometry.size.width - 32, 600))
+            .frame(maxWidth: .infinity)
+            #else
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .frame(maxWidth: min(geometry.size.width - 64, 600))
+            .frame(maxWidth: .infinity)
+            #endif
         }
-        #if os(iOS)
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        #else
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        #endif
         .toolbar {
             ToolbarItem(placement: {
                 #if os(iOS)

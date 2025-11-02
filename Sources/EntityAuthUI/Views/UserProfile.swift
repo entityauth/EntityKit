@@ -12,14 +12,10 @@ public struct UserProfile: View {
     public init() {}
 
     public var body: some View {
-        Button(action: { isPresented = true }) {
-            ZStack {
-                Circle().fill(.secondary).frame(width: 36, height: 36)
-                Image(systemName: "person.fill").foregroundStyle(.white)
-            }
-            .accessibilityLabel("Open user profile")
+        UserButton(provider: provider, size: .standard) {
+            isPresented = true
         }
-        .buttonStyle(.plain)
+        .accessibilityLabel("Open user profile")
         .sheet(isPresented: $isPresented) {
             UserProfileSheet(isPresented: $isPresented)
         }

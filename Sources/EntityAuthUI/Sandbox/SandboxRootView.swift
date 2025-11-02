@@ -91,7 +91,7 @@ private struct Preview: View {
         case .userProfile:
             UserProfile()
         case .userDisplay:
-            UserDisplay(provider: provider)
+            UserDisplayGallery()
         case .organizationSwitcher:
             OrganizationSwitcherView()
         }

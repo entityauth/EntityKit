@@ -30,8 +30,12 @@ public final class UserDisplayViewModel: ObservableObject {
             print("[UserDisplayVM] Subscribing to snapshot stream...")
             let stream = await provider.snapshotStream()
             for await snap in stream {
-                print("[UserDisplayVM] Snapshot userId=\(snap.userId ?? "nil") username=\(snap.username ?? "nil")")
-                self.output = .init(name: snap.username, email: nil, isLoading: false)
+                print("[UserDisplayVM] Snapshot userId=\(snap.userId ?? "nil") username=\(snap.username ?? "nil") email=\(snap.email ?? "nil")")
+                self.output = .init(
+                    name: snap.username,
+                    email: snap.email,
+                    isLoading: false
+                )
             }
         }
     }

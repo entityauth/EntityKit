@@ -44,7 +44,8 @@ private struct Preview: View {
             UserProfile()
                 .padding(.vertical, 8)
         case .userDisplay:
-            UserDisplay(provider: provider)
+            UserDisplayGallery()
+                .frame(minHeight: 300)
                 .padding(.vertical, 8)
         case .organizationSwitcher:
             OrganizationSwitcherView()
