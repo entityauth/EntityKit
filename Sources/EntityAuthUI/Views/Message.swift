@@ -1,10 +1,8 @@
 import SwiftUI
 
-/// A chat message component that combines UserDisplay with message bubbles.
-/// Provides pre-built layouts for common chat message patterns.
-public struct Message: View {
-    @Environment(\.entityAuthProvider) private var provider
-    
+/// A composable chat message component with support for custom content, authors, and actions.
+/// Provides pre-built layouts for common chat message patterns with beautiful styling.
+public struct Message<Content: View>: View {
     /// Message layout variant
     public enum Layout {
         case avatarInline       // Avatar aligned with message bubble (no username)
@@ -19,31 +17,47 @@ public struct Message: View {
         case tintedGlass(Color) // Liquid Glass with color tint
     }
     
+    private let author: MessageAuthor?
+    private let isCurrentUser: Bool
+    private let timestamp: Date?
     private let layout: Layout
-    private let text: String
-    private let username: String?
     private let bubbleStyle: BubbleStyle
     private let alignment: HorizontalAlignment
+    private let showTimestamp: Bool
+    private let actions: MessageActions?
+    private let content: Content
     
-    /// Create a message with specified layout and style
+    /// Create a composable message with custom content
     /// - Parameters:
-    ///   - text: The message text content
-    ///   - username: Optional username to display (required for avatarWithUsername and avatarStacked)
+    ///   - author: Author information (name, avatar). Pass nil to use current user from environment
+    ///   - isCurrentUser: Whether this message is from the current user (affects alignment and styling)
+    ///   - timestamp: Optional timestamp to display
     ///   - layout: How to arrange the avatar and message
     ///   - bubbleStyle: Visual style of the message bubble
     ///   - alignment: Horizontal alignment of the message (.leading or .trailing)
+    ///   - showTimestamp: Whether to show the timestamp (default: true if timestamp is provided)
+    ///   - actions: Optional actions (delete, edit, etc.)
+    ///   - content: Custom content to display in the message bubble
     public init(
-        text: String,
-        username: String? = nil,
+        author: MessageAuthor? = nil,
+        isCurrentUser: Bool = false,
+        timestamp: Date? = nil,
         layout: Layout = .avatarInline,
-        bubbleStyle: BubbleStyle = .filled(.blue),
-        alignment: HorizontalAlignment = .leading
+        bubbleStyle: BubbleStyle = .glass,
+        alignment: HorizontalAlignment = .leading,
+        showTimestamp: Bool = true,
+        actions: MessageActions? = nil,
+        @ViewBuilder content: () -> Content
     ) {
-        self.text = text
-        self.username = username
+        self.author = author
+        self.isCurrentUser = isCurrentUser
+        self.timestamp = timestamp
         self.layout = layout
         self.bubbleStyle = bubbleStyle
         self.alignment = alignment
+        self.showTimestamp = showTimestamp && timestamp != nil
+        self.actions = actions
+        self.content = content()
     }
     
     public var body: some View {
@@ -57,6 +71,11 @@ public struct Message: View {
                 avatarStackedLayout
             }
         }
+        .contextMenu {
+            if let actions = actions {
+                contextMenuContent(actions)
+            }
+        }
     }
     
     // MARK: - Layout Variants
@@ -64,13 +83,23 @@ public struct Message: View {
     private var avatarInlineLayout: some View {
         HStack(alignment: .top, spacing: 10) {
             if alignment == .leading {
-                UserDisplay(provider: provider, variant: .avatarOnly)
-                messageBubble
+                avatarView
+                VStack(alignment: .leading, spacing: 4) {
+                    messageBubble
+                    if showTimestamp, let timestamp = timestamp {
+                        timestampView(timestamp)
+                    }
+                }
                 Spacer()
             } else {
                 Spacer()
-                messageBubble
-                UserDisplay(provider: provider, variant: .avatarOnly)
+                VStack(alignment: .trailing, spacing: 4) {
+                    messageBubble
+                    if showTimestamp, let timestamp = timestamp {
+                        timestampView(timestamp)
+                    }
+                }
+                avatarView
             }
         }
     }
@@ -78,27 +107,33 @@ public struct Message: View {
     private var avatarWithUsernameLayout: some View {
         HStack(alignment: .top, spacing: 10) {
             if alignment == .leading {
-                UserDisplay(provider: provider, variant: .avatarOnly)
+                avatarView
                 VStack(alignment: .leading, spacing: 4) {
-                    if let username = username {
-                        Text(username)
+                    if let author = author {
+                        Text(author.name)
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
                     messageBubble
+                    if showTimestamp, let timestamp = timestamp {
+                        timestampView(timestamp)
+                    }
                 }
                 Spacer()
             } else {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    if let username = username {
-                        Text(username)
+                    if let author = author {
+                        Text(author.name)
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
                     messageBubble
+                    if showTimestamp, let timestamp = timestamp {
+                        timestampView(timestamp)
+                    }
                 }
-                UserDisplay(provider: provider, variant: .avatarOnly)
+                avatarView
             }
         }
     }
@@ -107,37 +142,132 @@ public struct Message: View {
         VStack(alignment: alignment, spacing: 6) {
             HStack(spacing: 8) {
                 if alignment == .leading {
-                    UserDisplay(provider: provider, variant: .avatarOnly)
-                    if let username = username {
-                        Text(username)
+                    avatarView
+                    if let author = author {
+                        Text(author.name)
                             .font(.system(.subheadline, design: .rounded, weight: .semibold))
                             .foregroundStyle(.primary)
                     }
                     Spacer()
+                    if showTimestamp, let timestamp = timestamp {
+                        timestampView(timestamp)
+                            .padding(.trailing, 4)
+                    }
                 } else {
+                    if showTimestamp, let timestamp = timestamp {
+                        timestampView(timestamp)
+                            .padding(.leading, 4)
+                    }
                     Spacer()
-                    if let username = username {
-                        Text(username)
+                    if let author = author {
+                        Text(author.name)
                             .font(.system(.subheadline, design: .rounded, weight: .semibold))
                             .foregroundStyle(.primary)
                     }
-                    UserDisplay(provider: provider, variant: .avatarOnly)
+                    avatarView
                 }
             }
             
-            messageBubble
-                .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
+            HStack {
+                if alignment == .leading {
+                    messageBubble
+                    Spacer()
+                } else {
+                    Spacer()
+                    messageBubble
+                }
+            }
+        }
+    }
+    
+    // MARK: - Avatar View
+    
+    @ViewBuilder
+    private var avatarView: some View {
+        if let author = author {
+            AvatarView(name: author.name, imageURL: author.avatarURL, size: 36)
+        } else {
+            // Fallback to environment provider for current user
+            EmptyView()
         }
     }
     
     // MARK: - Message Bubble
     
     private var messageBubble: some View {
-        Text(text)
-            .font(.system(.body, design: .rounded))
+        content
             .padding(12)
             .background(bubbleBackground)
             .foregroundStyle(bubbleForegroundColor)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+    
+    // MARK: - Timestamp View
+    
+    private func timestampView(_ date: Date) -> some View {
+        Text(formatTimestamp(date))
+            .font(.system(.caption2, design: .rounded))
+            .foregroundStyle(.tertiary)
+    }
+    
+    private func formatTimestamp(_ date: Date) -> String {
+        let calendar = Calendar.current
+        
+        if calendar.isDateInToday(date) {
+            let formatter = DateFormatter()
+            formatter.timeStyle = .short
+            return formatter.string(from: date)
+        } else if calendar.isDateInYesterday(date) {
+            let formatter = DateFormatter()
+            formatter.timeStyle = .short
+            return "Yesterday \(formatter.string(from: date))"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .short
+            return formatter.string(from: date)
+        }
+    }
+    
+    // MARK: - Context Menu
+    
+    @ViewBuilder
+    private func contextMenuContent(_ actions: MessageActions) -> some View {
+        if let onEdit = actions.onEdit {
+            Button {
+                onEdit()
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+        }
+        
+        if let onReply = actions.onReply {
+            Button {
+                onReply()
+            } label: {
+                Label("Reply", systemImage: "arrowshape.turn.up.left")
+            }
+        }
+        
+        if let onCopy = actions.onCopy {
+            Button {
+                onCopy()
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+        }
+        
+        if actions.onDelete != nil {
+            Divider()
+        }
+        
+        if let onDelete = actions.onDelete {
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
     
     @ViewBuilder
@@ -211,6 +341,133 @@ public struct Message: View {
             return .white
         case .glass, .tintedGlass:
             return .primary
+        }
+    }
+}
+
+// MARK: - Supporting Types
+
+/// Author information for a message
+public struct MessageAuthor: Equatable {
+    public let id: String
+    public let name: String
+    public let avatarURL: String?
+    
+    public init(id: String, name: String, avatarURL: String? = nil) {
+        self.id = id
+        self.name = name
+        self.avatarURL = avatarURL
+    }
+}
+
+/// Actions that can be performed on a message
+public struct MessageActions {
+    public let onEdit: (() -> Void)?
+    public let onReply: (() -> Void)?
+    public let onCopy: (() -> Void)?
+    public let onDelete: (() -> Void)?
+    
+    public init(
+        onEdit: (() -> Void)? = nil,
+        onReply: (() -> Void)? = nil,
+        onCopy: (() -> Void)? = nil,
+        onDelete: (() -> Void)? = nil
+    ) {
+        self.onEdit = onEdit
+        self.onReply = onReply
+        self.onCopy = onCopy
+        self.onDelete = onDelete
+    }
+}
+
+// MARK: - Internal Avatar View
+
+/// Internal avatar view for displaying user avatars in messages
+private struct AvatarView: View {
+    let name: String
+    let imageURL: String?
+    let size: CGFloat
+    
+    var body: some View {
+        Group {
+            if let imageURL = imageURL, let url = URL(string: imageURL) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        placeholderAvatar
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure:
+                        placeholderAvatar
+                    @unknown default:
+                        placeholderAvatar
+                    }
+                }
+            } else {
+                placeholderAvatar
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+    
+    private var placeholderAvatar: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            Text(name.prefix(1).uppercased())
+                .font(.system(size: size * 0.4, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+        }
+    }
+}
+
+// MARK: - Convenience Initializer for Text Messages
+
+extension Message where Content == Text {
+    /// Create a text message (convenience initializer for simple text content)
+    /// - Parameters:
+    ///   - text: The message text
+    ///   - author: Author information (name, avatar). Pass nil to use current user from environment
+    ///   - isCurrentUser: Whether this message is from the current user
+    ///   - timestamp: Optional timestamp to display
+    ///   - layout: How to arrange the avatar and message
+    ///   - bubbleStyle: Visual style of the message bubble
+    ///   - alignment: Horizontal alignment of the message (.leading or .trailing)
+    ///   - showTimestamp: Whether to show the timestamp
+    ///   - actions: Optional actions (delete, edit, etc.)
+    public init(
+        text: String,
+        author: MessageAuthor? = nil,
+        isCurrentUser: Bool = false,
+        timestamp: Date? = nil,
+        layout: Layout = .avatarInline,
+        bubbleStyle: BubbleStyle = .glass,
+        alignment: HorizontalAlignment = .leading,
+        showTimestamp: Bool = true,
+        actions: MessageActions? = nil
+    ) {
+        self.init(
+            author: author,
+            isCurrentUser: isCurrentUser,
+            timestamp: timestamp,
+            layout: layout,
+            bubbleStyle: bubbleStyle,
+            alignment: alignment,
+            showTimestamp: showTimestamp,
+            actions: actions
+        ) {
+            Text(text)
+                .font(.system(.body, design: .rounded))
         }
     }
 }
