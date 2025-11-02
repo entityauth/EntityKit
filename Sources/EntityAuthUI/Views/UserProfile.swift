@@ -110,6 +110,7 @@ private struct UserProfileSheet: View {
                 }
                 .padding(16)
             }
+            .scrollContentBackground(.hidden)
             .navigationTitle("Profile")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -476,36 +477,44 @@ private struct UserProfileSheet: View {
     // MARK: - Reusable rows (iOS)
     private func sectionRow(_ section: ProfileSection) -> some View {
         Button(action: { path.append(section) }) {
-            HStack(spacing: 14) {
-                // Icon Circle
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.15))
-                        .frame(width: 36, height: 36)
-                    
+            HStack(spacing: 16) {
+                // Section Info
+                HStack(spacing: 12) {
                     Image(section.iconName, bundle: .module)
                         .resizable()
                         .renderingMode(.template)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .foregroundStyle(.primary)
+                    
+                    Text(section.title)
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 
-                Text(section.title)
-                    .font(.system(.body, design: .rounded, weight: .medium))
-                    .foregroundStyle(.primary)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                // Chevron
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
             .background(
                 Group {
                     #if os(iOS)
                     if #available(iOS 26.0, *) {
+                        Capsule()
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    }
+                    #elseif os(macOS)
+                    if #available(macOS 15.0, *) {
                         Capsule()
                             .fill(.regularMaterial)
                             .glassEffect(.regular.interactive(true), in: .capsule)
@@ -519,11 +528,7 @@ private struct UserProfileSheet: View {
                     #endif
                 }
             )
-            .overlay(
-                Capsule()
-                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.05 : 0.08), radius: 8, x: 0, y: 2)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
