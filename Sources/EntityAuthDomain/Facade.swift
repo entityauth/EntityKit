@@ -641,6 +641,17 @@ public actor EntityAuthFacade {
         } else {
             snapshot.activeOrganization = nil
         }
+        // Also hydrate identity (email, username, image) to ensure snapshot is complete post-SSO/login
+        do {
+            let req = APIRequest(method: .get, path: "/api/user/me")
+            let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
+            snapshot.userId = me.id
+            snapshot.username = me.username
+            snapshot.email = me.email
+            snapshot.imageUrl = me.imageUrl
+        } catch {
+            // Non-fatal; keep prior identity fields if request fails
+        }
         print("[EntityAuth][refreshUserData] end orgs=\(organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil") (from token oid=\(tokenOid ?? "nil"))")
         emit()
     }
