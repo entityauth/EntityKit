@@ -91,21 +91,57 @@ public struct UserButton: View {
     
     @ViewBuilder
     private func avatarView(for output: UserDisplayViewModel.Output?) -> some View {
+        let dimension = size.avatarSize
         if output == nil || output!.isLoading {
             // Loading skeleton
             Circle()
                 .fill(.tertiary.opacity(0.5))
-                .frame(width: size.avatarSize, height: size.avatarSize)
+                .frame(width: dimension, height: dimension)
                 .overlay {
                     ProgressView()
                         .scaleEffect(0.6)
                 }
+        } else if let urlString = output!.imageUrl, let url = URL(string: urlString), !urlString.isEmpty {
+            // Load avatar image if available
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    Circle()
+                        .fill(.tertiary.opacity(0.5))
+                        .frame(width: dimension, height: dimension)
+                        .overlay { ProgressView().scaleEffect(0.6) }
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: dimension, height: dimension)
+                        .clipShape(Circle())
+                case .failure:
+                    ZStack {
+                        Circle()
+                            .fill(.blue.gradient)
+                            .frame(width: dimension, height: dimension)
+                        Text(userInitial(from: output!.name))
+                            .font(.system(size == .compact ? .caption2 : .caption, design: .rounded, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                @unknown default:
+                    ZStack {
+                        Circle()
+                            .fill(.blue.gradient)
+                            .frame(width: dimension, height: dimension)
+                        Text(userInitial(from: output!.name))
+                            .font(.system(size == .compact ? .caption2 : .caption, design: .rounded, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
         } else {
-            // User avatar with initial
+            // Fallback to initial when no image URL
             ZStack {
                 Circle()
                     .fill(.blue.gradient)
-                    .frame(width: size.avatarSize, height: size.avatarSize)
+                    .frame(width: dimension, height: dimension)
                 
                 Text(userInitial(from: output!.name))
                     .font(.system(size == .compact ? .caption2 : .caption, design: .rounded, weight: .bold))
