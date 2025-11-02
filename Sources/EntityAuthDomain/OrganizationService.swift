@@ -11,6 +11,10 @@ public protocol OrganizationsProviding: Sendable {
     func switchActive(workspaceTenantId: String, orgId: String) async throws -> String
     func list() async throws -> [OrganizationSummaryDTO]
     func active() async throws -> ActiveOrganizationDTO?
+    // Updates for active organization (derived from access token org context)
+    func setActiveOrgName(_ name: String) async throws
+    func setActiveOrgSlug(_ slug: String) async throws
+    func setActiveOrgImageUrl(_ imageUrl: String) async throws
 }
 
 public final class OrganizationService: OrganizationsProviding {
@@ -136,5 +140,30 @@ public final class OrganizationService: OrganizationsProviding {
     public func active() async throws -> ActiveOrganizationDTO? {
         // Not supported via generic HTTP; active org is derived from realtime
         return nil
+    }
+
+    // MARK: - Updates
+    public func setActiveOrgName(_ name: String) async throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
+        let payload = try JSONSerialization.data(withJSONObject: ["name": trimmed])
+        let req = APIRequest(method: .post, path: "/api/org/name", headers: ["content-type": "application/json"], body: payload)
+        _ = try await client.send(req)
+    }
+
+    public func setActiveOrgSlug(_ slug: String) async throws {
+        let trimmed = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
+        let payload = try JSONSerialization.data(withJSONObject: ["slug": trimmed])
+        let req = APIRequest(method: .post, path: "/api/org/slug", headers: ["content-type": "application/json"], body: payload)
+        _ = try await client.send(req)
+    }
+
+    public func setActiveOrgImageUrl(_ imageUrl: String) async throws {
+        let trimmed = imageUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw EntityAuthError.invalidResponse }
+        let payload = try JSONSerialization.data(withJSONObject: ["imageUrl": trimmed])
+        let req = APIRequest(method: .post, path: "/api/org/image", headers: ["content-type": "application/json"], body: payload)
+        _ = try await client.send(req)
     }
 }

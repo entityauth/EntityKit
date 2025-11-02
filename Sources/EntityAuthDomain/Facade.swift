@@ -481,6 +481,22 @@ public actor EntityAuthFacade {
         try await refreshUserData()
     }
 
+    // MARK: - Organization updates (active org)
+    public func setOrganizationName(_ name: String) async throws {
+        try await dependencies.organizationService.setActiveOrgName(name)
+        try? await refreshUserData()
+    }
+
+    public func setOrganizationSlug(_ slug: String) async throws {
+        try await dependencies.organizationService.setActiveOrgSlug(slug)
+        try? await refreshUserData()
+    }
+
+    public func setOrganizationImageUrl(_ imageUrl: String) async throws {
+        try await dependencies.organizationService.setActiveOrgImageUrl(imageUrl)
+        try? await refreshUserData()
+    }
+
     public func addMember(orgId: String, userId: String, role: String) async throws {
         try await dependencies.organizationService.addMember(orgId: orgId, userId: userId, role: role)
         try await refreshUserData()

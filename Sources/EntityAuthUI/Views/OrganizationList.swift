@@ -508,23 +508,44 @@ public struct OrganizationList: View {
     }
     
     private func saveOrganizationChanges(orgId: String, name: String, slug: String) async {
-        // TODO: Implement actual save logic through provider
-        print("[OrganizationList] Saving org changes: id=\(orgId), name=\(name), slug=\(slug)")
-        
-        // Simulate save delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        // Close edit sheet and reload
-        editingOrganization = nil
-        try? await load()
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            print("[OrganizationList] save begin orgId=\(orgId) name=\(name) slug=\(slug)")
+            // Active org is derived from token; switching to the org before save ensures the endpoints target it
+            do {
+                try await ea.switchOrganization(id: orgId)
+                print("[OrganizationList] switched to orgId=\(orgId)")
+            } catch {
+                print("[OrganizationList] switchOrganization failed: \(error)")
+                throw error
+            }
+            do {
+                try await ea.setOrganizationName(name)
+                print("[OrganizationList] setOrganizationName ok")
+            } catch {
+                print("[OrganizationList] setOrganizationName error: \(error)")
+                throw error
+            }
+            do {
+                try await ea.setOrganizationSlug(slug)
+                print("[OrganizationList] setOrganizationSlug ok")
+            } catch {
+                print("[OrganizationList] setOrganizationSlug error: \(error)")
+                throw error
+            }
+            editingOrganization = nil
+            try? await load()
+        } catch {
+            self.error = error.localizedDescription
+            print("[OrganizationList] save error: \(error)")
+        }
     }
     
     private func saveOrganizationImage(orgId: String, imageData: Data) async {
-        // TODO: Implement actual image upload logic through provider
-        print("[OrganizationList] Saving org image: id=\(orgId), bytes=\(imageData.count)")
-        
-        // Simulate upload delay
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        // TODO: Wire actual upload flow (Convex or customer storage) and call setOrganizationImageUrl
+        _ = orgId
+        _ = imageData
     }
 }
 
