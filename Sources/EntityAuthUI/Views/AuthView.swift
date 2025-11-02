@@ -33,11 +33,6 @@ public struct AuthView: View {
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
     
-    public enum AuthTab {
-        case signIn
-        case register
-    }
-    
     public enum VariantTab: String, CaseIterable {
         case embedded = "Embedded View"
         case modal = "Modal View"
@@ -1009,65 +1004,7 @@ public struct AuthView: View {
     }
 }
 
-// MARK: - Custom Tab Picker
-
-/// Custom tab picker that mimics the toolbar variant switcher style using Liquid Glass
-private struct CustomTabPicker: View {
-    @Binding var selection: AuthView.AuthTab
-    
-    var body: some View {
-        HStack(spacing: 0) {
-            // Sign In Tab
-            Button(action: { 
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    selection = .signIn 
-                }
-            }) {
-                Text("Sign in")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(selection == .signIn ? Color.primary : Color.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
-            .background {
-                if selection == .signIn {
-                    Capsule()
-                        .fill(.regularMaterial)
-                        .glassEffect(.regular.interactive(true), in: .capsule)
-                }
-            }
-            
-            // Create Account Tab
-            Button(action: { 
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    selection = .register 
-                }
-            }) {
-                Text("Create account")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(selection == .register ? Color.primary : Color.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
-            .background {
-                if selection == .register {
-                    Capsule()
-                        .fill(.regularMaterial)
-                        .glassEffect(.regular.interactive(true), in: .capsule)
-                }
-            }
-        }
-        .padding(2)
-        .background {
-            Capsule()
-                .fill(.tertiary.opacity(0.5))
-        }
-    }
-}
-
-// iOS-only sheet detents modifier
+// MARK: - iOS-only sheet detents modifier
 private struct IOSSheetDetents: ViewModifier {
     func body(content: Content) -> some View {
         #if os(iOS)

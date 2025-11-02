@@ -29,11 +29,29 @@ public struct UserProfileToolbarButton: View {
     @State private var isPresented = false
     @Environment(\.entityAuthProvider) private var provider
     
-    public init() {}
+    public enum Style {
+        case avatar  // Shows user's avatar with initial letter
+        case icon    // Shows generic user icon (system image)
+    }
+    
+    private let style: Style
+    
+    public init(style: Style = .avatar) {
+        self.style = style
+    }
     
     public var body: some View {
         Button(action: { isPresented = true }) {
-            UserDisplay(provider: provider, variant: .avatarOnly)
+            switch style {
+            case .avatar:
+                UserDisplay(provider: provider, variant: .avatarOnly)
+            case .icon:
+                Image("User", bundle: .module)
+                    .resizable()
+                    .renderingMode(.template)
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(.secondary)
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open user profile")

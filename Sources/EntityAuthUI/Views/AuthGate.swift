@@ -13,7 +13,7 @@ public struct AuthGate: View {
     public init() {}
 
     public var body: some View {
-        AuthView(
+        AuthFormContent(
             email: $email,
             password: $password,
             errorText: $errorText,
