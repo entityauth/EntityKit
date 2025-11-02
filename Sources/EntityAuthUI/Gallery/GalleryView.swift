@@ -18,6 +18,11 @@ public struct GalleryView: View {
             }
         }
         .padding()
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                UserProfileToolbarButton()
+            }
+        }
     }
 
     private var filteredItems: [ComponentItem] {
@@ -41,10 +46,15 @@ private struct Preview: View {
             AuthView()
                 .padding(.vertical, 8)
         case .userProfile:
-            UserProfile()
+            UserProfileGallery()
+                .frame(minHeight: 300)
                 .padding(.vertical, 8)
         case .userDisplay:
             UserDisplayGallery()
+                .frame(minHeight: 300)
+                .padding(.vertical, 8)
+        case .organizationDisplay:
+            OrganizationDisplayGallery()
                 .frame(minHeight: 300)
                 .padding(.vertical, 8)
         case .message:

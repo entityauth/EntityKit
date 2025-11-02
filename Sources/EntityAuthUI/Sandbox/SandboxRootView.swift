@@ -34,6 +34,11 @@ public struct SandboxRootView: View {
             .searchable(text: $query, placement: .sidebar)
         } detail: {
             AuthOrContent(selection: selection)
+                .toolbar {
+                    ToolbarItem(placement: .automatic) {
+                        UserProfileToolbarButton()
+                    }
+                }
         }
     }
 
@@ -101,9 +106,11 @@ private struct Preview: View {
                 errorText: $errorText
             )
         case .userProfile:
-            UserProfile()
+            UserProfileGallery()
         case .userDisplay:
             UserDisplayGallery()
+        case .organizationDisplay:
+            OrganizationDisplayGallery()
         case .message:
             MessageGallery()
         case .organizationSwitcher:

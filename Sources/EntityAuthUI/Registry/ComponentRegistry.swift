@@ -4,6 +4,7 @@ public enum ComponentKind: String, CaseIterable, Sendable {
     case authView = "auth-view"
     case userProfile = "user-profile"
     case userDisplay = "user-display"
+    case organizationDisplay = "organization-display"
     case message = "message"
     case organizationSwitcher = "organization-switcher"
 }
@@ -42,6 +43,14 @@ public let componentRegistry: [ComponentItem] = [
         keywords: ["user", "identity", "avatar", "button", "profile"],
         group: "Core",
         component: .userDisplay
+    ),
+    .init(
+        title: "Organization Display",
+        slug: ["org", "display"],
+        description: "Modern organization identity components with Liquid Glass design - display variants for showing org info",
+        keywords: ["organization", "org", "identity", "avatar", "display"],
+        group: "Core",
+        component: .organizationDisplay
     ),
     .init(
         title: "Message",

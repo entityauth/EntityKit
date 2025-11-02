@@ -24,6 +24,25 @@ public struct UserProfile: View {
     }
 }
 
+/// A toolbar-ready user profile button that displays a user avatar and opens the profile sheet
+public struct UserProfileToolbarButton: View {
+    @State private var isPresented = false
+    @Environment(\.entityAuthProvider) private var provider
+    
+    public init() {}
+    
+    public var body: some View {
+        Button(action: { isPresented = true }) {
+            UserDisplay(provider: provider, variant: .avatarOnly)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open user profile")
+        .sheet(isPresented: $isPresented) {
+            UserProfileSheet(isPresented: $isPresented)
+        }
+    }
+}
+
 private enum ProfileSection: String, CaseIterable, Hashable {
     case account
     case organizations
@@ -59,6 +78,7 @@ private struct UserProfileSheet: View {
     @Binding var isPresented: Bool
     @State private var selected: ProfileSection = .account
     @State private var path: [ProfileSection] = []
+    @State private var isEditingAccount: Bool = false
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
 
@@ -313,11 +333,75 @@ private struct UserProfileSheet: View {
     
     private var accountDetailView: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Account")
-                .font(.system(.title2, design: .rounded, weight: .semibold))
+            HStack {
+                Text("Account")
+                    .font(.system(.title2, design: .rounded, weight: .semibold))
+                
+                Spacer()
+                
+                // Edit Toggle Button
+                Button(action: { isEditingAccount.toggle() }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isEditingAccount ? "xmark.circle.fill" : "pencil.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                        
+                        Text(isEditingAccount ? "Cancel" : "Edit")
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    }
+                    .foregroundStyle(isEditingAccount ? Color.secondary : Color.blue)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Group {
+                            #if os(iOS)
+                            if #available(iOS 26.0, *) {
+                                Capsule()
+                                    .fill(.regularMaterial)
+                                    .glassEffect(.regular.interactive(true), in: .capsule)
+                            } else {
+                                Capsule()
+                                    .fill(.quaternary)
+                            }
+                            #elseif os(macOS)
+                            if #available(macOS 15.0, *) {
+                                Capsule()
+                                    .fill(.regularMaterial)
+                                    .glassEffect(.regular.interactive(true), in: .capsule)
+                            } else {
+                                Capsule()
+                                    .fill(.quaternary)
+                            }
+                            #else
+                            Capsule()
+                                .fill(.quaternary)
+                            #endif
+                        }
+                    )
+                }
+                .buttonStyle(.plain)
+            }
             
-            // User Display Component
-            UserDisplay(provider: provider, variant: .plain)
+            // User Display or Edit Mode
+            if isEditingAccount {
+                UserDisplayEditable(
+                    provider: provider,
+                    onSave: { name, email in
+                        Task {
+                            await saveAccountChanges(name: name, email: email)
+                        }
+                    },
+                    onCancel: {
+                        isEditingAccount = false
+                    },
+                    onImageSelected: { imageData in
+                        Task {
+                            await saveProfileImage(imageData)
+                        }
+                    }
+                )
+            } else {
+                UserDisplay(provider: provider, variant: .plain)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
@@ -487,6 +571,27 @@ private struct UserProfileSheet: View {
         }
         .buttonStyle(.plain)
     }
+    
+    // MARK: - Account Save Handlers
+    
+    private func saveAccountChanges(name: String, email: String) async {
+        // TODO: Implement actual save logic through provider
+        print("[UserProfile] Saving account changes: name=\(name), email=\(email)")
+        
+        // Simulate save delay
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        
+        // Exit edit mode on success
+        isEditingAccount = false
+    }
+    
+    private func saveProfileImage(_ imageData: Data) async {
+        // TODO: Implement actual image upload logic through provider
+        print("[UserProfile] Saving profile image: \(imageData.count) bytes")
+        
+        // Simulate upload delay
+        try? await Task.sleep(nanoseconds: 500_000_000)
+    }
 }
 
 // MARK: - Section Detail (for iOS navigation)
@@ -495,13 +600,33 @@ private struct SectionDetail: View {
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
     @Binding var isPresented: Bool
+    @State private var isEditingAccount: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 switch section {
                 case .account:
-                    UserDisplay(provider: provider, variant: .plain)
+                    if isEditingAccount {
+                        UserDisplayEditable(
+                            provider: provider,
+                            onSave: { name, email in
+                                Task {
+                                    await saveAccountChanges(name: name, email: email)
+                                }
+                            },
+                            onCancel: {
+                                isEditingAccount = false
+                            },
+                            onImageSelected: { imageData in
+                                Task {
+                                    await saveProfileImage(imageData)
+                                }
+                            }
+                        )
+                    } else {
+                        UserDisplay(provider: provider, variant: .plain)
+                    }
                     
                 case .organizations:
                     OrganizationList(onDismiss: { isPresented = false })
@@ -522,6 +647,34 @@ private struct SectionDetail: View {
             .padding()
         }
         .navigationTitle(section.title)
+        .toolbar {
+            if section == .account {
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { isEditingAccount.toggle() }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: isEditingAccount ? "xmark.circle.fill" : "pencil.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                            
+                            Text(isEditingAccount ? "Cancel" : "Edit")
+                                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        }
+                        .foregroundStyle(isEditingAccount ? Color.secondary : Color.blue)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+    
+    private func saveAccountChanges(name: String, email: String) async {
+        print("[SectionDetail] Saving account changes: name=\(name), email=\(email)")
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        isEditingAccount = false
+    }
+    
+    private func saveProfileImage(_ imageData: Data) async {
+        print("[SectionDetail] Saving profile image: \(imageData.count) bytes")
+        try? await Task.sleep(nanoseconds: 500_000_000)
     }
 }
 

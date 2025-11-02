@@ -81,10 +81,6 @@ public struct MessageGallery: View {
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
                         
-                        Text("Avatar aligned with message bubble, no username")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.tertiary)
-                        
                         Message(
                             text: "Hey! Just wanted to check in on the progress.",
                             layout: .avatarInline,
@@ -99,10 +95,6 @@ public struct MessageGallery: View {
                         Text("Avatar with Username")
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
-                        
-                        Text("Avatar inline, username label above the bubble")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.tertiary)
                         
                         Message(
                             text: "This variant is perfect when you want to show who sent the message!",
@@ -119,10 +111,6 @@ public struct MessageGallery: View {
                         Text("Avatar Stacked")
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
-                        
-                        Text("Avatar and username on same row, message below")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.tertiary)
                         
                         Message(
                             text: "This is perfect! The new variants make it so much easier to build custom chat interfaces.",
@@ -152,10 +140,6 @@ public struct MessageGallery: View {
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
                         
-                        Text("Glassmorphic effect matching app design")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.tertiary)
-                        
                         Message(
                             text: "Glass style with liquid glass effect",
                             layout: .avatarInline,
@@ -177,10 +161,6 @@ public struct MessageGallery: View {
                         Text("Tinted Glass")
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
-                        
-                        Text("Liquid Glass with color tint using .tint() API")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.tertiary)
                         
                         Message(
                             text: "Tinted glass with blue color",
@@ -209,10 +189,6 @@ public struct MessageGallery: View {
                         Text("Filled")
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
-                        
-                        Text("Solid color background with white text")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.tertiary)
                         
                         Message(
                             text: "Filled style with solid blue background",

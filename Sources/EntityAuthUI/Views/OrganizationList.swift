@@ -13,6 +13,7 @@ public struct OrganizationList: View {
     @State private var newOrgSlug: String = ""
     @State private var creating: Bool = false
     @State private var showingCreateForm: Bool = false
+    @State private var editingOrganization: OrganizationSummary?
     
     public var onDismiss: (() -> Void)?
     
@@ -22,17 +23,52 @@ public struct OrganizationList: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header - Create button only
+            // Header - Create button
             HStack {
-                Spacer()
-                
                 // Create button
                 Button(action: { showingCreateForm.toggle() }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.blue)
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        
+                        Text("Create a New Organization")
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        Group {
+                            #if os(iOS)
+                            if #available(iOS 26.0, *) {
+                                Capsule()
+                                    .fill(.gray.gradient)
+                                    .glassEffect(.regular.interactive(true), in: .capsule)
+                            } else {
+                                Capsule()
+                                    .fill(.gray.gradient)
+                                    .shadow(color: .gray.opacity(0.3), radius: 4, x: 0, y: 2)
+                            }
+                            #elseif os(macOS)
+                            if #available(macOS 15.0, *) {
+                                Capsule()
+                                    .fill(.gray.gradient)
+                                    .glassEffect(.regular.interactive(true), in: .capsule)
+                            } else {
+                                Capsule()
+                                    .fill(.gray.gradient)
+                                    .shadow(color: .gray.opacity(0.3), radius: 4, x: 0, y: 2)
+                            }
+                            #else
+                            Capsule()
+                                .fill(.gray.gradient)
+                            #endif
+                        }
+                    )
                 }
                 .buttonStyle(.plain)
+                
+                Spacer()
             }
             
             // Content
@@ -61,84 +97,204 @@ public struct OrganizationList: View {
     
     @ViewBuilder
     private func organizationMenuItem(org: OrganizationSummary) -> some View {
-        Button(action: {
-            guard activeOrgId != org.orgId else { return }
+        HStack(spacing: 16) {
+            // Organization Info
+            VStack(alignment: .leading, spacing: 6) {
+                Text(org.name ?? org.slug ?? org.orgId)
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                
+                Text(org.role.capitalized)
+                    .font(.system(.caption, design: .rounded, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Status or Action
+            HStack(spacing: 8) {
+                if activeOrgId == org.orgId {
+                    activeOrgBadge
+                } else {
+                    switchButton(for: org)
+                }
+                
+                // Edit button (only for owner/admin)
+                if org.role == "owner" || org.role == "admin" {
+                    editButton(for: org)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            Group {
+                #if os(iOS)
+                if #available(iOS 26.0, *) {
+                    Capsule()
+                        .fill(.regularMaterial)
+                        .glassEffect(.regular.interactive(true), in: .capsule)
+                } else {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                }
+                #elseif os(macOS)
+                if #available(macOS 15.0, *) {
+                    Capsule()
+                        .fill(.regularMaterial)
+                        .glassEffect(.regular.interactive(true), in: .capsule)
+                } else {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                }
+                #else
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                #endif
+            }
+        )
+        .contentShape(Capsule())
+    }
+    
+    // MARK: - Active Org Badge
+    
+    private var activeOrgBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+            
+            Text("Active")
+                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Group {
+                #if os(iOS)
+                if #available(iOS 26.0, *) {
+                    Capsule()
+                        .fill(.green.gradient)
+                        .glassEffect(.regular.interactive(false), in: .capsule)
+                } else {
+                    Capsule()
+                        .fill(.green.gradient)
+                        .shadow(color: .green.opacity(0.3), radius: 4, x: 0, y: 2)
+                }
+                #elseif os(macOS)
+                if #available(macOS 15.0, *) {
+                    Capsule()
+                        .fill(.green.gradient)
+                        .glassEffect(.regular.interactive(false), in: .capsule)
+                } else {
+                    Capsule()
+                        .fill(.green.gradient)
+                        .shadow(color: .green.opacity(0.3), radius: 4, x: 0, y: 2)
+                }
+                #else
+                Capsule()
+                    .fill(.green.gradient)
+                #endif
+            }
+        )
+    }
+    
+    // MARK: - Switch Button
+    
+    @ViewBuilder
+    private func switchButton(for org: OrganizationSummary) -> some View {
+        Button(action: { 
             Task { 
                 await switchTo(orgId: org.orgId)
                 onDismiss?()
             }
         }) {
-            HStack(spacing: 12) {
-                // Icon
-                ZStack {
-                    Circle()
-                        .fill(activeOrgId == org.orgId ? AnyShapeStyle(.blue.gradient) : AnyShapeStyle(.secondary.opacity(0.2)))
-                        .frame(width: 40, height: 40)
-                    
-                    Text((org.name ?? org.slug ?? org.orgId).prefix(1).uppercased())
-                        .font(.system(.body, design: .rounded, weight: .bold))
-                        .foregroundStyle(activeOrgId == org.orgId ? .white : .secondary)
-                }
-                
-                // Info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(org.name ?? org.slug ?? org.orgId)
-                        .font(.system(.body, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    
-                    Text(org.role.capitalized)
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                // Active Badge
-                if activeOrgId == org.orgId {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.blue)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                Group {
-                    #if os(iOS)
-                    if #available(iOS 26.0, *) {
+            Text("Switch")
+                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    Group {
+                        #if os(iOS)
+                        if #available(iOS 26.0, *) {
+                            Capsule()
+                                .fill(.regularMaterial)
+                                .glassEffect(.regular.interactive(true), in: .capsule)
+                        } else {
+                            Capsule()
+                                .fill(.quaternary)
+                        }
+                        #elseif os(macOS)
+                        if #available(macOS 15.0, *) {
+                            Capsule()
+                                .fill(.regularMaterial)
+                                .glassEffect(.regular.interactive(true), in: .capsule)
+                        } else {
+                            Capsule()
+                                .fill(.quaternary)
+                        }
+                        #else
                         Capsule()
-                            .fill(activeOrgId == org.orgId ? .blue.opacity(0.1) : .clear)
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(activeOrgId == org.orgId ? .blue.opacity(0.3) : .clear, lineWidth: 1)
-                            )
-                    } else {
-                        Capsule()
-                            .fill(activeOrgId == org.orgId ? .blue.opacity(0.1) : .clear)
+                            .fill(.quaternary)
+                        #endif
                     }
-                    #elseif os(macOS)
-                    if #available(macOS 15.0, *) {
-                        Capsule()
-                            .fill(activeOrgId == org.orgId ? .blue.opacity(0.1) : .clear)
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(activeOrgId == org.orgId ? .blue.opacity(0.3) : .clear, lineWidth: 1)
-                            )
-                    } else {
-                        Capsule()
-                            .fill(activeOrgId == org.orgId ? .blue.opacity(0.1) : .clear)
-                    }
-                    #else
-                    Capsule()
-                        .fill(activeOrgId == org.orgId ? .blue.opacity(0.1) : .clear)
-                    #endif
-                }
-            )
+                )
         }
         .buttonStyle(.plain)
-        .allowsHitTesting(!(isLoading || activeOrgId == org.orgId))
+        .disabled(isLoading)
         .opacity(isLoading ? 0.5 : 1.0)
+    }
+    
+    // MARK: - Edit Button
+    
+    @ViewBuilder
+    private func editButton(for org: OrganizationSummary) -> some View {
+        Button(action: { editingOrganization = org }) {
+            Image(systemName: "pencil.circle.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.blue)
+        }
+        .buttonStyle(.plain)
+        .sheet(item: $editingOrganization) { org in
+            NavigationStack {
+                OrganizationDisplayEditable(
+                    organization: org,
+                    onSave: { name, slug in
+                        Task {
+                            await saveOrganizationChanges(orgId: org.orgId, name: name, slug: slug)
+                        }
+                    },
+                    onCancel: {
+                        editingOrganization = nil
+                    },
+                    onImageSelected: { imageData in
+                        Task {
+                            await saveOrganizationImage(orgId: org.orgId, imageData: imageData)
+                        }
+                    }
+                )
+                .padding()
+                .navigationTitle("Edit Organization")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") {
+                            editingOrganization = nil
+                        }
+                    }
+                }
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            #endif
+        }
     }
     
     // MARK: - Create Organization Form
@@ -349,6 +505,26 @@ public struct OrganizationList: View {
         if result.hasPrefix("-") { result.removeFirst() }
         if result.hasSuffix("-") { result.removeLast() }
         return result.isEmpty ? "org" : result
+    }
+    
+    private func saveOrganizationChanges(orgId: String, name: String, slug: String) async {
+        // TODO: Implement actual save logic through provider
+        print("[OrganizationList] Saving org changes: id=\(orgId), name=\(name), slug=\(slug)")
+        
+        // Simulate save delay
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        
+        // Close edit sheet and reload
+        editingOrganization = nil
+        try? await load()
+    }
+    
+    private func saveOrganizationImage(orgId: String, imageData: Data) async {
+        // TODO: Implement actual image upload logic through provider
+        print("[OrganizationList] Saving org image: id=\(orgId), bytes=\(imageData.count)")
+        
+        // Simulate upload delay
+        try? await Task.sleep(nanoseconds: 500_000_000)
     }
 }
 
