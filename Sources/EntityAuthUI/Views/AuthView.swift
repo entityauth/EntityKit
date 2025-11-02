@@ -190,8 +190,12 @@ public struct AuthView: View {
                         #endif
                     }
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 24))
-                .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 4)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.12), radius: 16, x: 0, y: 4)
                 .frame(maxWidth: maxWidth)
             }
             .frame(maxWidth: maxWidth)
@@ -358,8 +362,12 @@ public struct AuthView: View {
                     #endif
                 }
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
+            )
             .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 4)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.12), radius: 16, x: 0, y: 4)
         }
         .frame(idealWidth: idealWidth)
         .padding()
@@ -375,47 +383,74 @@ public struct AuthView: View {
             VStack(spacing: 12) {
             // Email/Password Form
             #if os(iOS)
-            TextField("Email", text: $email)
+            TextField("", text: $email, prompt: Text("Email"))
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .rounded))
                 .padding(.horizontal, 16)
+                .padding(.trailing, 40)
                 .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .fill(Color(.systemGray6))
+                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                 )
+                .overlay(alignment: .trailing) {
+                    Image("AtSign", bundle: .module)
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.trailing, 16)
+                }
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
                 .disabled(isLoading)
             #else
-            TextField("Email", text: $email)
+            TextField("", text: $email, prompt: Text("Email"))
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .rounded))
                 .padding(.horizontal, 16)
+                .padding(.trailing, 40)
                 .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .fill(Color(.systemGray).opacity(0.1))
+                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                 )
+                .overlay(alignment: .trailing) {
+                    Image("AtSign", bundle: .module)
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.trailing, 16)
+                }
                 .disabled(isLoading)
             #endif
             
-            SecureField("Password", text: $password)
+            SecureField("", text: $password, prompt: Text("••••••••"))
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .rounded))
                 .padding(.horizontal, 16)
+                .padding(.trailing, 40)
                 .padding(.vertical, 12)
                 .background(
                     Group {
                         #if os(iOS)
                         Capsule()
-                            .fill(Color(.systemGray6))
+                            .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                         #else
                         Capsule()
-                            .fill(Color(.systemGray).opacity(0.1))
+                            .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                         #endif
                     }
                 )
+                .overlay(alignment: .trailing) {
+                    Image("Password", bundle: .module)
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.trailing, 16)
+                }
                 .disabled(isLoading)
             
                     Button(action: {
@@ -493,7 +528,7 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray6))
+                                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 }
                                 #elseif os(macOS)
                                 if #available(macOS 15.0, *) {
@@ -502,11 +537,11 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray).opacity(0.1))
+                                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                                 }
                                 #else
                                 Capsule()
-                                    .fill(Color(.systemGray6))
+                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 #endif
                             }
                         )
@@ -538,7 +573,7 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray6))
+                                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 }
                                 #elseif os(macOS)
                                 if #available(macOS 15.0, *) {
@@ -547,11 +582,11 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray).opacity(0.1))
+                                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                                 }
                                 #else
                                 Capsule()
-                                    .fill(Color(.systemGray6))
+                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 #endif
                             }
                         )
@@ -583,7 +618,7 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray6))
+                                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 }
                                 #elseif os(macOS)
                                 if #available(macOS 15.0, *) {
@@ -592,11 +627,11 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray).opacity(0.1))
+                                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                                 }
                                 #else
                                 Capsule()
-                                    .fill(Color(.systemGray6))
+                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 #endif
                             }
                         )
@@ -619,47 +654,74 @@ public struct AuthView: View {
             VStack(spacing: 12) {
             // Email/Password Form
             #if os(iOS)
-            TextField("Email", text: $email)
+            TextField("", text: $email, prompt: Text("Email"))
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .rounded))
                 .padding(.horizontal, 16)
+                .padding(.trailing, 40)
                 .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .fill(Color(.systemGray6))
+                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                 )
+                .overlay(alignment: .trailing) {
+                    Image("AtSign", bundle: .module)
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.trailing, 16)
+                }
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
                 .disabled(isLoading)
             #else
-            TextField("Email", text: $email)
+            TextField("", text: $email, prompt: Text("Email"))
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .rounded))
                 .padding(.horizontal, 16)
+                .padding(.trailing, 40)
                 .padding(.vertical, 12)
                 .background(
                     Capsule()
-                        .fill(Color(.systemGray).opacity(0.1))
+                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                 )
+                .overlay(alignment: .trailing) {
+                    Image("AtSign", bundle: .module)
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.trailing, 16)
+                }
                 .disabled(isLoading)
             #endif
             
-            SecureField("Password", text: $password)
+            SecureField("", text: $password, prompt: Text("Create a password"))
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .rounded))
                 .padding(.horizontal, 16)
+                .padding(.trailing, 40)
                 .padding(.vertical, 12)
                 .background(
                     Group {
                         #if os(iOS)
                         Capsule()
-                            .fill(Color(.systemGray6))
+                            .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                         #else
                         Capsule()
-                            .fill(Color(.systemGray).opacity(0.1))
+                            .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                         #endif
                     }
                 )
+                .overlay(alignment: .trailing) {
+                    Image("Password", bundle: .module)
+                        .resizable()
+                        .renderingMode(.template)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.trailing, 16)
+                }
                 .disabled(isLoading)
             
             Button(action: {
@@ -737,7 +799,7 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray6))
+                                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 }
                                 #elseif os(macOS)
                                 if #available(macOS 15.0, *) {
@@ -746,11 +808,11 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray).opacity(0.1))
+                                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                                 }
                                 #else
                                 Capsule()
-                                    .fill(Color(.systemGray6))
+                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 #endif
                             }
                         )
@@ -782,7 +844,7 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray6))
+                                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 }
                                 #elseif os(macOS)
                                 if #available(macOS 15.0, *) {
@@ -791,11 +853,11 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray).opacity(0.1))
+                                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                                 }
                                 #else
                                 Capsule()
-                                    .fill(Color(.systemGray6))
+                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 #endif
                             }
                         )
@@ -822,7 +884,7 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray6))
+                                        .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 }
                                 #elseif os(macOS)
                                 if #available(macOS 15.0, *) {
@@ -831,11 +893,11 @@ public struct AuthView: View {
                                         .glassEffect(.regular.interactive(true), in: .capsule)
                                 } else {
                                     Capsule()
-                                        .fill(Color(.systemGray).opacity(0.1))
+                                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                                 }
                                 #else
                                 Capsule()
-                                    .fill(Color(.systemGray6))
+                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                                 #endif
                             }
                         )
@@ -865,7 +927,7 @@ public struct AuthView: View {
                     .padding(.vertical, 12)
                     .background(
                         Capsule()
-                            .fill(Color(.systemGray6))
+                            .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
                     )
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
@@ -877,7 +939,7 @@ public struct AuthView: View {
                     .padding(.vertical, 12)
                     .background(
                         Capsule()
-                            .fill(Color(.systemGray).opacity(0.1))
+                            .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
                     )
                 #endif
                 

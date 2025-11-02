@@ -1,0 +1,59 @@
+{
+  "images": [
+    {
+      "idiom": "universal",
+      "filename": "PasswordLight.png",
+      "scale": "1x"
+    },
+    {
+      "idiom": "universal",
+      "filename": "PasswordLight@2x.png",
+      "scale": "2x"
+    },
+    {
+      "idiom": "universal",
+      "filename": "PasswordLight@3x.png",
+      "scale": "3x"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "idiom": "universal",
+      "filename": "PasswordDark.png",
+      "scale": "1x"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "idiom": "universal",
+      "filename": "PasswordDark@2x.png",
+      "scale": "2x"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "idiom": "universal",
+      "filename": "PasswordDark@3x.png",
+      "scale": "3x"
+    }
+  ],
+  "info": {
+    "version": 1,
+    "author": "xcode"
+  },
+  "properties": {
+    "preserves-vector-representation": false
+  }
+}
