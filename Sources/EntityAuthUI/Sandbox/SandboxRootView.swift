@@ -3,7 +3,11 @@ import EntityAuthDomain
 
 public struct SandboxRootView: View {
     @State private var query: String = ""
-    @State private var selection: ComponentItem? = componentRegistry.first
+    #if os(iOS)
+    @State private var selection: ComponentItem? = nil  // Start with sidebar on iOS
+    #else
+    @State private var selection: ComponentItem? = componentRegistry.first  // Auto-select first on macOS
+    #endif
     @Environment(\.entityAuthProvider) private var provider
 
     public init() {}
@@ -26,6 +30,7 @@ public struct SandboxRootView: View {
                 Text(item.title).font(.headline)
                     .tag(item)
             }
+            .navigationTitle("Components")
             .searchable(text: $query, placement: .sidebar)
         } detail: {
             AuthOrContent(selection: selection)
@@ -61,7 +66,14 @@ private struct AuthOrContent: View {
             }
         }
         .task {
-            // Consider authenticated if we ever get a snapshot with a userId
+            // Check current snapshot first
+            let current = await provider.currentSnapshot()
+            if current.userId != nil {
+                isAuthenticated = true
+                return
+            }
+            
+            // Then listen to stream for changes
             let stream = await provider.snapshotStream()
             for await snap in stream {
                 if snap.userId != nil {
@@ -92,6 +104,8 @@ private struct Preview: View {
             UserProfile()
         case .userDisplay:
             UserDisplayGallery()
+        case .message:
+            MessageGallery()
         case .organizationSwitcher:
             OrganizationSwitcherView()
         }

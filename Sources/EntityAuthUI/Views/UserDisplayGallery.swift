@@ -11,13 +11,13 @@ public struct UserDisplayGallery: View {
     public enum VariantTab: String, CaseIterable {
         case display = "Display Variants"
         case button = "Interactive Button"
-        case integrated = "In Context"
+        case context = "In Context"
         
         var icon: String {
             switch self {
             case .display: return "person.crop.rectangle"
             case .button: return "hand.tap"
-            case .integrated: return "apps.iphone"
+            case .context: return "apps.iphone"
             }
         }
     }
@@ -40,11 +40,11 @@ public struct UserDisplayGallery: View {
                 }
                 .tag(VariantTab.button)
             
-            integratedVariantView
+            contextVariantView
                 .tabItem {
-                    Label(VariantTab.integrated.rawValue, systemImage: VariantTab.integrated.icon)
+                    Label(VariantTab.context.rawValue, systemImage: VariantTab.context.icon)
                 }
-                .tag(VariantTab.integrated)
+                .tag(VariantTab.context)
         }
         .sheet(isPresented: $showProfileSheet) {
             NavigationStack {
@@ -72,8 +72,8 @@ public struct UserDisplayGallery: View {
                 displayVariantView
             case .button:
                 buttonVariantView
-            case .integrated:
-                integratedVariantView
+            case .context:
+                contextVariantView
             }
         }
         .toolbar {
@@ -117,7 +117,7 @@ public struct UserDisplayGallery: View {
                 VStack(spacing: 24) {
                     // Expanded variant
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Expanded")
+                        Text("Expanded (Glass Container)")
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
                         
@@ -128,11 +128,33 @@ public struct UserDisplayGallery: View {
                     
                     // Compact variant
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Compact")
+                        Text("Compact (Glass Container)")
                             .font(.system(.headline, design: .rounded))
                             .foregroundStyle(.secondary)
                         
                         UserDisplay(provider: provider, variant: .compact)
+                    }
+                    
+                    Divider().padding(.horizontal)
+                    
+                    // Plain variant (no container)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Plain (No Container)")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        
+                        UserDisplay(provider: provider, variant: .plain)
+                    }
+                    
+                    Divider().padding(.horizontal)
+                    
+                    // Avatar only variant
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Avatar Only")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        
+                        UserDisplay(provider: provider, variant: .avatarOnly)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -181,9 +203,9 @@ public struct UserDisplayGallery: View {
         }
     }
     
-    // MARK: - Integrated Variant View
+    // MARK: - Context Variant View
     
-    private var integratedVariantView: some View {
+    private var contextVariantView: some View {
         ScrollView {
             VStack(spacing: 24) {
                 // Mock Toolbar

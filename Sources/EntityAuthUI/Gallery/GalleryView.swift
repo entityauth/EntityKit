@@ -47,6 +47,10 @@ private struct Preview: View {
             UserDisplayGallery()
                 .frame(minHeight: 300)
                 .padding(.vertical, 8)
+        case .message:
+            MessageGallery()
+                .frame(minHeight: 300)
+                .padding(.vertical, 8)
         case .organizationSwitcher:
             OrganizationSwitcherView()
                 .frame(minHeight: 300)

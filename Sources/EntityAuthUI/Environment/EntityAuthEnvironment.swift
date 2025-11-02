@@ -149,7 +149,7 @@ public extension AnyEntityAuthProvider {
         )
         let state = State(orgs: orgs, activeId: nil, snapshot: initialSnapshot)
         return AnyEntityAuthProvider(
-            stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap) } } },
+            stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap); continuation.finish() } } },
             current: { await state.current() },
             organizations: { try await state.organizations() },
             baseURL: { URL(string: "https://example.com")! },
@@ -214,7 +214,7 @@ public extension AnyEntityAuthProvider {
         )
         let state = State(orgs: orgs, activeId: activeOrgId, snapshot: initialSnapshot)
         return AnyEntityAuthProvider(
-            stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap) } } },
+            stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap); continuation.finish() } } },
             current: { await state.current() },
             organizations: { try await state.organizations() },
             baseURL: { URL(string: "https://example.com")! },
