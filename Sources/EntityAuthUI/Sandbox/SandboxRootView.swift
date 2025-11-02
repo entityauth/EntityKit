@@ -23,13 +23,9 @@ public struct SandboxRootView: View {
     public var body: some View {
         NavigationSplitView {
             List(filteredItems, selection: $selection) { item in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title).font(.headline)
-                    Text(item.description).font(.subheadline).foregroundStyle(.secondary)
-                }
-                .tag(item)
+                Text(item.title).font(.headline)
+                    .tag(item)
             }
-            .navigationTitle("UI Components")
             .searchable(text: $query, placement: .sidebar)
         } detail: {
             AuthOrContent(selection: selection)
@@ -56,15 +52,7 @@ private struct AuthOrContent: View {
         Group {
             if isAuthenticated {
                 if let item = selection {
-                    if item.component == .organizationSwitcher {
-                        Preview(item: item)
-                            .padding()
-                            .navigationTitle(item.title)
-                    } else {
-                        ScrollView { Preview(item: item) }
-                            .padding()
-                            .navigationTitle(item.title)
-                    }
+                    Preview(item: item)
                 } else {
                     ContentUnavailableView("Select a component", systemImage: "square.grid.2x2")
                 }
@@ -91,8 +79,6 @@ private struct Preview: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var errorText: String?
-    @State private var showOrgSheet: Bool = false
-    @State private var showOrgPopover: Bool = false
 
     var body: some View {
         switch item.component {
@@ -102,53 +88,12 @@ private struct Preview: View {
                 password: $password,
                 errorText: $errorText
             )
-        case .authViewModal:
-            VStack(spacing: 16) {
-                Text("Tap to present auth in a modal").font(.caption).foregroundStyle(.secondary)
-                AuthViewModal(title: "Sign in")
-            }
         case .userProfile:
-            VStack(spacing: 12) {
-                Text("Toolbar-style preview").font(.caption).foregroundStyle(.secondary)
-                UserProfile()
-            }
+            UserProfile()
         case .userDisplay:
             UserDisplay(provider: provider)
         case .organizationSwitcher:
-            VStack(alignment: .leading, spacing: 16) {
-                // Inline preview
-                Text("Inline component").font(.caption).foregroundStyle(.secondary)
-                OrganizationSwitcherView()
-
-                // iOS: Presentation sheet demo
-                #if os(iOS)
-                Divider()
-                Text("iOS presentation sheet").font(.caption).foregroundStyle(.secondary)
-                Button("My Organizations") { showOrgSheet = true }
-                    .buttonStyle(.borderedProminent)
-                    .sheet(isPresented: $showOrgSheet) {
-                        NavigationStack {
-                            OrganizationSwitcherView()
-                                .navigationTitle("My Organizations")
-                                .navigationBarTitleDisplayMode(.inline)
-                                .padding()
-                        }
-                    }
-                #endif
-
-                // macOS: Popover-style menu demo
-                #if os(macOS)
-                Divider()
-                Text("macOS menu (popover)").font(.caption).foregroundStyle(.secondary)
-                Button("My Organizations") { showOrgPopover = true }
-                    .buttonStyle(.borderedProminent)
-                    .popover(isPresented: $showOrgPopover, arrowEdge: .bottom) {
             OrganizationSwitcherView()
-                            .frame(width: 420, height: 520)
-                            .padding()
-                    }
-                #endif
-            }
         }
     }
 }

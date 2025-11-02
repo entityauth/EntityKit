@@ -40,14 +40,6 @@ private struct Preview: View {
         case .authView:
             AuthView()
                 .padding(.vertical, 8)
-        case .authViewModal:
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Modal variant")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                AuthViewModal(title: "Sign in")
-            }
-            .padding(.vertical, 8)
         case .userProfile:
             UserProfile()
                 .padding(.vertical, 8)
