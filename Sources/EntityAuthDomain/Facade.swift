@@ -419,8 +419,14 @@ public actor EntityAuthFacade {
             try await ensureOrganizationAndActivateIfMissing()
             try await refreshUserData()
             if snapshot.activeOrganization == nil, let firstOrg = snapshot.organizations.first?.orgId {
-                let newToken = try? await dependencies.organizationService.switchOrg(orgId: firstOrg)
-                if let newToken { try? dependencies.authState.update(accessToken: newToken); snapshot.accessToken = newToken; try? await refreshUserData() }
+                do {
+                    let newToken = try await dependencies.organizationService.switchOrg(orgId: firstOrg)
+                    try dependencies.authState.update(accessToken: newToken)
+                    snapshot.accessToken = newToken
+                    try await refreshUserData()
+                } catch {
+                    print("[EntityAuth][applyTokens] WARNING: Failed to switch to first org: \(error)")
+                }
             }
             emit()
         }
@@ -963,10 +969,16 @@ extension EntityAuthFacade {
                         if let access, isAccessTokenExpiringSoon(access) {
                             print("[EntityAuth][initializeAsync] Token expiring soon - refreshing...")
                             let refreshed = try await dependencies.authService.refresh()
-                            try? dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
-                            snapshot.accessToken = refreshed.accessToken
-                            snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
-                            print("[EntityAuth][initializeAsync] Token refreshed - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
+                            print("[EntityAuth][initializeAsync] Refresh succeeded, updating authState...")
+                            do {
+                                try dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
+                                snapshot.accessToken = refreshed.accessToken
+                                snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
+                                print("[EntityAuth][initializeAsync] AuthState updated successfully - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
+                            } catch {
+                                print("[EntityAuth][initializeAsync] CRITICAL ERROR: Failed to update authState after successful refresh: \(error)")
+                                throw error // Propagate the error instead of silently continuing with stale tokens
+                            }
                         } else {
                             print("[EntityAuth][initializeAsync] Token not expiring soon, using existing")
                         }
@@ -987,10 +999,11 @@ extension EntityAuthFacade {
                             print("[EntityAuth][initializeAsync] Attempting token refresh due to error...")
                             do {
                                 let refreshed = try await dependencies.authService.refresh()
-                                try? dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
+                                print("[EntityAuth][initializeAsync] Retry refresh succeeded, updating authState...")
+                                try dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
                                 snapshot.accessToken = refreshed.accessToken
                                 snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
-                                print("[EntityAuth][initializeAsync] Token refreshed after error - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
+                                print("[EntityAuth][initializeAsync] Retry authState updated - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
                                 let req = APIRequest(method: .get, path: "/api/user/me")
                                 let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
                                 snapshot.userId = me.id
@@ -999,7 +1012,7 @@ extension EntityAuthFacade {
                                 snapshot.imageUrl = me.imageUrl
                                 print("[EntityAuth][initializeAsync] Retry successful: userId=\(me.id)")
                             } catch {
-                                print("[EntityAuth][initializeAsync] Retry FAILED: \(error)")
+                                print("[EntityAuth][initializeAsync] Retry FAILED: \(error) - Error type: \(type(of: error))")
                             }
                         }
                     }
@@ -1051,13 +1064,14 @@ extension EntityAuthFacade {
                         print("[EntityAuth][initializeAsync] Step 7: Switching to first org: \(firstOrg)")
                         do {
                             let newToken = try await dependencies.organizationService.switchOrg(orgId: firstOrg)
-                            try? dependencies.authState.update(accessToken: newToken)
+                            print("[EntityAuth][initializeAsync] Step 7: Got new token, updating authState...")
+                            try dependencies.authState.update(accessToken: newToken)
                             snapshot.accessToken = newToken
-                            print("[EntityAuth][initializeAsync] Step 7: Got new token with oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
+                            print("[EntityAuth][initializeAsync] Step 7: AuthState updated - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
                             try await refreshUserData()
                             print("[EntityAuth][initializeAsync] Step 7: refreshUserData() after switch SUCCESS")
                         } catch {
-                            print("[EntityAuth][initializeAsync] Step 7 ERROR: switchOrg/refreshUserData FAILED: \(error)")
+                            print("[EntityAuth][initializeAsync] Step 7 ERROR: switchOrg/refreshUserData FAILED: \(error) - Error type: \(type(of: error))")
                         }
                     }
                     
