@@ -750,6 +750,19 @@ public actor EntityAuthFacade {
             if let nsError = error as NSError? {
                 print("[EntityAuth][refreshUserData] NSError domain=\(nsError.domain) code=\(nsError.code) userInfo=\(nsError.userInfo)")
             }
+            
+            // If 404, user was deleted - clear all auth state
+            if case let EntityAuthError.network(status, _) = error, status == 404 {
+                print("[EntityAuth][refreshUserData] User not found (404) - clearing tokens")
+                try? authState.clear()
+                snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, email: nil, imageUrl: nil, organizations: [], activeOrganization: nil)
+                emit()
+                await dependencies.realtime.stop()
+                lastUserStore.clear()
+                print("[EntityAuth][refreshUserData] Auth cleared due to deleted user")
+                return // Exit early
+            }
+            
             throw error // Re-throw so caller knows it failed
         }
         
@@ -764,7 +777,19 @@ public actor EntityAuthFacade {
             print("[EntityAuth][refreshUserData] Updated identity: userId=\(me.id) email=\(me.email ?? "nil")")
         } catch {
             print("[EntityAuth][refreshUserData] WARNING: Failed to fetch /api/user/me: \(error) - keeping prior identity")
-            // Non-fatal; keep prior identity fields if request fails
+            
+            // If 404, user was deleted - clear all auth state
+            if case let EntityAuthError.network(status, _) = error, status == 404 {
+                print("[EntityAuth][refreshUserData] User not found (404) in /api/user/me - clearing tokens")
+                try? authState.clear()
+                snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, email: nil, imageUrl: nil, organizations: [], activeOrganization: nil)
+                emit()
+                await dependencies.realtime.stop()
+                lastUserStore.clear()
+                print("[EntityAuth][refreshUserData] Auth cleared due to deleted user")
+                return // Exit early
+            }
+            // Non-fatal for other errors; keep prior identity fields if request fails
         }
         
         print("[EntityAuth][refreshUserData] END orgs=\(snapshot.organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil")")
@@ -994,6 +1019,19 @@ extension EntityAuthFacade {
                     } catch {
                         print("[EntityAuth][initializeAsync] Step 2 ERROR: \(error)")
                         print("[EntityAuth][initializeAsync] Error type: \(type(of: error))")
+                        
+                        // If 404, user was deleted - clear all auth state and bail out
+                        if case let EntityAuthError.network(status, _) = error, status == 404 {
+                            print("[EntityAuth][initializeAsync] User not found (404) - user may have been deleted. Clearing tokens.")
+                            try? authState.clear()
+                            snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, email: nil, imageUrl: nil, organizations: [], activeOrganization: nil)
+                            emit()
+                            await dependencies.realtime.stop()
+                            lastUserStore.clear()
+                            print("[EntityAuth][initializeAsync] Auth cleared due to deleted user")
+                            return // Exit early - don't continue hydration
+                        }
+                        
                         // If failure indicates expired/invalid access token, attempt one refresh then retry hydration
                         if shouldAttemptRefresh(after: error) {
                             print("[EntityAuth][initializeAsync] Attempting token refresh due to error...")
