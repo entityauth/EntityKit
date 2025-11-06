@@ -156,11 +156,6 @@ public struct UserProfileGallery: View {
                         
                         Text("Your App Content Here")
                             .font(.system(.title3, design: .rounded, weight: .semibold))
-                        
-                        Text("Click the avatar button in the toolbar above to open the user profile")
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
                     }
                     .padding(.vertical, 60)
                 }
