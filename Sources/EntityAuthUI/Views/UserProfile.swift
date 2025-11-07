@@ -6,12 +6,46 @@ import UIKit
 import AppKit
 #endif
 
+/// Feature flags for user profile sections
+public struct UserProfileFeatureFlags: Sendable {
+    public let showInvitations: Bool
+    public let showPreferences: Bool
+    public let showSecurity: Bool
+    public let showDeleteAccount: Bool
+    
+    public init(
+        showInvitations: Bool = false,
+        showPreferences: Bool = false,
+        showSecurity: Bool = false,
+        showDeleteAccount: Bool = false
+    ) {
+        self.showInvitations = showInvitations
+        self.showPreferences = showPreferences
+        self.showSecurity = showSecurity
+        self.showDeleteAccount = showDeleteAccount
+    }
+    
+    /// Default flags with only core sections enabled
+    public static let production = UserProfileFeatureFlags()
+    
+    /// All sections enabled for development
+    public static let development = UserProfileFeatureFlags(
+        showInvitations: true,
+        showPreferences: true,
+        showSecurity: true,
+        showDeleteAccount: true
+    )
+}
+
 public struct UserProfile: View {
     @State private var isPresented = false
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
+    private let featureFlags: UserProfileFeatureFlags
 
-    public init() {}
+    public init(featureFlags: UserProfileFeatureFlags = .production) {
+        self.featureFlags = featureFlags
+    }
 
     public var body: some View {
         UserButton(provider: provider, size: .standard) {
@@ -19,7 +53,7 @@ public struct UserProfile: View {
         }
         .accessibilityLabel("Open user profile")
         .sheet(isPresented: $isPresented) {
-            UserProfileSheet(isPresented: $isPresented)
+            UserProfileSheet(isPresented: $isPresented, featureFlags: featureFlags)
         }
     }
 }
@@ -28,6 +62,7 @@ public struct UserProfile: View {
 public struct UserProfileToolbarButton: View {
     @State private var isPresented = false
     @Environment(\.entityAuthProvider) private var provider
+    private let featureFlags: UserProfileFeatureFlags
     
     public enum Style {
         case avatar  // Shows user's avatar with initial letter
@@ -36,8 +71,9 @@ public struct UserProfileToolbarButton: View {
     
     private let style: Style
     
-    public init(style: Style = .avatar) {
+    public init(style: Style = .avatar, featureFlags: UserProfileFeatureFlags = .production) {
         self.style = style
+        self.featureFlags = featureFlags
     }
     
     public var body: some View {
@@ -55,7 +91,7 @@ public struct UserProfileToolbarButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Open user profile")
         .sheet(isPresented: $isPresented) {
-            UserProfileSheet(isPresented: $isPresented)
+            UserProfileSheet(isPresented: $isPresented, featureFlags: featureFlags)
         }
     }
 }
@@ -89,6 +125,26 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         case .deleteAccount: return "DeleteX"
         }
     }
+    
+    /// Returns sections that should be visible based on feature flags
+    static func visibleSections(with flags: UserProfileFeatureFlags) -> [ProfileSection] {
+        var sections: [ProfileSection] = [.account, .organizations]
+        
+        if flags.showInvitations {
+            sections.append(.invitations)
+        }
+        if flags.showPreferences {
+            sections.append(.preferences)
+        }
+        if flags.showSecurity {
+            sections.append(.security)
+        }
+        if flags.showDeleteAccount {
+            sections.append(.deleteAccount)
+        }
+        
+        return sections
+    }
 }
 
 private struct UserProfileSheet: View {
@@ -99,6 +155,11 @@ private struct UserProfileSheet: View {
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.profileImageUploader) private var profileImageUploader
+    let featureFlags: UserProfileFeatureFlags
+    
+    private var visibleSections: [ProfileSection] {
+        ProfileSection.visibleSections(with: featureFlags)
+    }
 
     var body: some View {
         #if os(iOS)
@@ -118,7 +179,7 @@ private struct UserProfileSheet: View {
                 VStack(spacing: 16) {
                     // Section Cards
                     VStack(spacing: 12) {
-                        ForEach(ProfileSection.allCases, id: \.self) { section in
+                        ForEach(visibleSections, id: \.self) { section in
                             sectionRow(section)
                         }
                     }
@@ -217,7 +278,7 @@ private struct UserProfileSheet: View {
         VStack(spacing: 0) {
             // Navigation Buttons
             VStack(spacing: 6) {
-                ForEach(ProfileSection.allCases, id: \.self) { section in
+                ForEach(visibleSections, id: \.self) { section in
                 Button(action: { 
                     withAnimation(.easeInOut(duration: 0.2)) {
                         selected = section 
