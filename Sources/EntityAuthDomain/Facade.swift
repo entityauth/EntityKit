@@ -38,6 +38,7 @@ public actor EntityAuthFacade {
         public var authService: any (AuthProviding & RefreshService)
         public var organizationService: OrganizationsProviding
         public var entitiesService: EntitiesProviding
+        public var invitationService: InvitationsProviding
         public var refreshHandler: TokenRefresher
         public var apiClient: any APIClientType
         public var realtime: RealtimeSubscriptionHandling
@@ -48,6 +49,7 @@ public actor EntityAuthFacade {
             authService: any (AuthProviding & RefreshService),
             organizationService: OrganizationsProviding,
             entitiesService: EntitiesProviding,
+            invitationService: InvitationsProviding,
             refreshHandler: TokenRefresher,
             apiClient: any APIClientType,
             realtime: RealtimeSubscriptionHandling
@@ -58,6 +60,7 @@ public actor EntityAuthFacade {
             self.authService = authService
             self.organizationService = organizationService
             self.entitiesService = entitiesService
+            self.invitationService = invitationService
             self.refreshHandler = refreshHandler
             self.apiClient = apiClient
             self.realtime = realtime
@@ -84,6 +87,7 @@ public actor EntityAuthFacade {
             let authService = AuthService(client: client, authState: authState)
             let organizationService = OrganizationService(client: client)
             let entitiesService = EntitiesService(client: client)
+            let invitationService = InvitationService(client: client)
             let realtime = RealtimeCoordinator(baseURL: finalConfig.baseURL) { baseURL in
                 let request = APIRequest(method: .get, path: "/api/convex", requiresAuthentication: false)
                 let data = try await client.send(request)
@@ -98,6 +102,7 @@ public actor EntityAuthFacade {
                 authService: authService,
                 organizationService: organizationService,
                 entitiesService: entitiesService,
+                invitationService: invitationService,
                 refreshHandler: refresher,
                 apiClient: client,
                 realtime: realtime
@@ -572,6 +577,38 @@ public actor EntityAuthFacade {
     public func setOrganizationImageUrl(_ imageUrl: String) async throws {
         try await dependencies.organizationService.setActiveOrgImageUrl(imageUrl)
         try? await refreshUserData()
+    }
+
+    // MARK: - Organization members
+    public func listOrganizationMembers(orgId: String) async throws -> [OrgMemberDTO] {
+        try await dependencies.organizationService.listMembers(orgId: orgId)
+    }
+    public func removeOrganizationMember(orgId: String, userId: String) async throws {
+        try await dependencies.organizationService.removeMember(orgId: orgId, userId: userId)
+        try? await refreshUserData()
+    }
+    // MARK: - Invitations
+    public func searchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? {
+        try await dependencies.invitationService.findUser(email: email, username: username)
+    }
+    public func listInvitationsReceived(for userId: String) async throws -> [Invitation] {
+        try await dependencies.invitationService.listReceived(for: userId)
+    }
+    public func listInvitationsSent(by inviterId: String) async throws -> [Invitation] {
+        try await dependencies.invitationService.listSent(by: inviterId)
+    }
+    public func sendInvitation(orgId: String, inviteeId: String, role: String) async throws {
+        try await dependencies.invitationService.send(orgId: orgId, inviteeId: inviteeId, role: role)
+    }
+    public func acceptInvitation(invitationId: String) async throws {
+        try await dependencies.invitationService.accept(invitationId: invitationId)
+        try? await refreshUserData()
+    }
+    public func declineInvitation(invitationId: String) async throws {
+        try await dependencies.invitationService.decline(invitationId: invitationId)
+    }
+    public func revokeInvitation(invitationId: String) async throws {
+        try await dependencies.invitationService.revoke(invitationId: invitationId)
     }
 
     public func addMember(orgId: String, userId: String, role: String) async throws {

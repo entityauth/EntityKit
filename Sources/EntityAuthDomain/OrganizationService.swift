@@ -2,10 +2,19 @@ import Foundation
 import EntityAuthCore
 import EntityAuthNetworking
 
+// Public DTO for organization members (top-level so protocols can reference it)
+public struct OrgMemberDTO: Decodable, Sendable {
+    public let userId: String
+    public let role: String
+    public let joinedAt: Double?
+}
+
 public protocol OrganizationsProviding: Sendable {
     func create(name: String, slug: String, ownerId: String) async throws
     func create(workspaceTenantId: String, name: String, slug: String, ownerId: String) async throws
     func addMember(orgId: String, userId: String, role: String) async throws
+    func listMembers(orgId: String) async throws -> [OrgMemberDTO]
+    func removeMember(orgId: String, userId: String) async throws
     func switchActive(orgId: String) async throws -> String
     func switchOrg(orgId: String) async throws -> String
     func switchActive(workspaceTenantId: String, orgId: String) async throws -> String
@@ -71,6 +80,40 @@ public final class OrganizationService: OrganizationsProviding {
         let body = try JSONSerialization.data(withJSONObject: payload)
         let request = APIRequest(method: .post, path: "/api/relations", body: body)
         _ = try await client.send(request)
+    }
+
+    public func listMembers(orgId: String) async throws -> [OrgMemberDTO] {
+        // Query relations by dstId (org) and relation member_of
+        let params = [
+            URLQueryItem(name: "dstId", value: orgId),
+            URLQueryItem(name: "relation", value: "member_of")
+        ]
+        let relReq = APIRequest(method: .get, path: "/api/relations", queryItems: params)
+        struct RelationDTO: Decodable { let srcId: String; let attrs: [String: AnyCodable]? }
+        let relations = try await client.send(relReq, decode: [RelationDTO].self)
+        return relations.map { rel in
+            OrgMemberDTO(
+                userId: rel.srcId,
+                role: rel.attrs?["role"]?.stringValue ?? "member",
+                joinedAt: rel.attrs?["joinedAt"]?.doubleValue
+            )
+        }
+    }
+
+    public func removeMember(orgId: String, userId: String) async throws {
+        guard let workspaceTenantId = client.workspaceTenantId else {
+            throw EntityAuthError.configurationMissingWorkspaceTenantId
+        }
+        let payload: [String: Any] = [
+            "op": "unlink",
+            "workspaceTenantId": workspaceTenantId,
+            "srcId": userId,
+            "relation": "member_of",
+            "dstId": orgId
+        ]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let req = APIRequest(method: .post, path: "/api/relations", body: body)
+        _ = try await client.send(req)
     }
 
     public func switchOrg(orgId: String) async throws -> String {

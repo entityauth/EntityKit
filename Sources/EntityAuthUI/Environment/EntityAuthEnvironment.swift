@@ -30,6 +30,17 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _setOrgName: @Sendable (_ name: String) async throws -> Void
     private let _setOrgSlug: @Sendable (_ slug: String) async throws -> Void
     private let _setOrgImageUrl: @Sendable (_ imageUrl: String) async throws -> Void
+    // Members
+    private let _listMembers: @Sendable (_ orgId: String) async throws -> [OrgMemberDTO]
+    private let _removeMember: @Sendable (_ orgId: String, _ userId: String) async throws -> Void
+    // Invitations
+    private let _inviteSearchUser: @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?
+    private let _invitationsReceived: @Sendable (_ userId: String) async throws -> [Invitation]
+    private let _invitationsSent: @Sendable (_ inviterId: String) async throws -> [Invitation]
+    private let _inviteSend: @Sendable (_ orgId: String, _ inviteeId: String, _ role: String) async throws -> Void
+    private let _inviteAccept: @Sendable (_ invitationId: String) async throws -> Void
+    private let _inviteDecline: @Sendable (_ invitationId: String) async throws -> Void
+    private let _inviteRevoke: @Sendable (_ invitationId: String) async throws -> Void
 
     public init(
         stream: @escaping @Sendable () async -> AsyncStream<Snapshot>,
@@ -54,7 +65,16 @@ public struct AnyEntityAuthProvider: Sendable {
         setImageUrl: @escaping @Sendable (_ imageUrl: String) async throws -> Void,
         setOrgName: @escaping @Sendable (_ name: String) async throws -> Void,
         setOrgSlug: @escaping @Sendable (_ slug: String) async throws -> Void,
-        setOrgImageUrl: @escaping @Sendable (_ imageUrl: String) async throws -> Void
+        setOrgImageUrl: @escaping @Sendable (_ imageUrl: String) async throws -> Void,
+        listMembers: @escaping @Sendable (_ orgId: String) async throws -> [OrgMemberDTO],
+        removeMember: @escaping @Sendable (_ orgId: String, _ userId: String) async throws -> Void,
+        inviteSearchUser: @escaping @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?,
+        invitationsReceived: @escaping @Sendable (_ userId: String) async throws -> [Invitation],
+        invitationsSent: @escaping @Sendable (_ inviterId: String) async throws -> [Invitation],
+        inviteSend: @escaping @Sendable (_ orgId: String, _ inviteeId: String, _ role: String) async throws -> Void,
+        inviteAccept: @escaping @Sendable (_ invitationId: String) async throws -> Void,
+        inviteDecline: @escaping @Sendable (_ invitationId: String) async throws -> Void,
+        inviteRevoke: @escaping @Sendable (_ invitationId: String) async throws -> Void
     ) {
         self._stream = stream
         self._current = current
@@ -79,6 +99,15 @@ public struct AnyEntityAuthProvider: Sendable {
         self._setOrgName = setOrgName
         self._setOrgSlug = setOrgSlug
         self._setOrgImageUrl = setOrgImageUrl
+        self._listMembers = listMembers
+        self._removeMember = removeMember
+        self._inviteSearchUser = inviteSearchUser
+        self._invitationsReceived = invitationsReceived
+        self._invitationsSent = invitationsSent
+        self._inviteSend = inviteSend
+        self._inviteAccept = inviteAccept
+        self._inviteDecline = inviteDecline
+        self._inviteRevoke = inviteRevoke
     }
 
     public func snapshotStream() async -> AsyncStream<Snapshot> { await _stream() }
@@ -104,6 +133,15 @@ public struct AnyEntityAuthProvider: Sendable {
     public func setOrganizationName(_ name: String) async throws { try await _setOrgName(name) }
     public func setOrganizationSlug(_ slug: String) async throws { try await _setOrgSlug(slug) }
     public func setOrganizationImageUrl(_ imageUrl: String) async throws { try await _setOrgImageUrl(imageUrl) }
+    public func listMembers(orgId: String) async throws -> [OrgMemberDTO] { try await _listMembers(orgId) }
+    public func removeMember(orgId: String, userId: String) async throws { try await _removeMember(orgId, userId) }
+    public func inviteSearchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? { try await _inviteSearchUser(email, username) }
+    public func invitationsReceived(userId: String) async throws -> [Invitation] { try await _invitationsReceived(userId) }
+    public func invitationsSent(inviterId: String) async throws -> [Invitation] { try await _invitationsSent(inviterId) }
+    public func inviteSend(orgId: String, inviteeId: String, role: String) async throws { try await _inviteSend(orgId, inviteeId, role) }
+    public func inviteAccept(invitationId: String) async throws { try await _inviteAccept(invitationId) }
+    public func inviteDecline(invitationId: String) async throws { try await _inviteDecline(invitationId) }
+    public func inviteRevoke(invitationId: String) async throws { try await _inviteRevoke(invitationId) }
 }
 
 public extension AnyEntityAuthProvider {
@@ -141,7 +179,16 @@ public extension AnyEntityAuthProvider {
             setImageUrl: { value in try await facade.setImageUrl(value) },
             setOrgName: { value in try await facade.setOrganizationName(value) },
             setOrgSlug: { value in try await facade.setOrganizationSlug(value) },
-            setOrgImageUrl: { value in try await facade.setOrganizationImageUrl(value) }
+            setOrgImageUrl: { value in try await facade.setOrganizationImageUrl(value) },
+            listMembers: { orgId in try await facade.listOrganizationMembers(orgId: orgId) },
+            removeMember: { orgId, userId in try await facade.removeOrganizationMember(orgId: orgId, userId: userId) },
+            inviteSearchUser: { email, username in try await facade.searchUser(email: email, username: username) },
+            invitationsReceived: { userId in try await facade.listInvitationsReceived(for: userId) },
+            invitationsSent: { inviterId in try await facade.listInvitationsSent(by: inviterId) },
+            inviteSend: { orgId, inviteeId, role in try await facade.sendInvitation(orgId: orgId, inviteeId: inviteeId, role: role) },
+            inviteAccept: { invitationId in try await facade.acceptInvitation(invitationId: invitationId) },
+            inviteDecline: { invitationId in try await facade.declineInvitation(invitationId: invitationId) },
+            inviteRevoke: { invitationId in try await facade.revokeInvitation(invitationId: invitationId) }
         )
     }
 
@@ -201,7 +248,16 @@ public extension AnyEntityAuthProvider {
             setImageUrl: { _ in },
             setOrgName: { _ in },
             setOrgSlug: { _ in },
-            setOrgImageUrl: { _ in }
+            setOrgImageUrl: { _ in },
+            listMembers: { _ in [] },
+            removeMember: { _, _ in },
+            inviteSearchUser: { _, _ in nil },
+            invitationsReceived: { _ in [] },
+            invitationsSent: { _ in [] },
+            inviteSend: { _, _, _ in },
+            inviteAccept: { _ in },
+            inviteDecline: { _ in },
+            inviteRevoke: { _ in }
         )
     }
 
@@ -272,7 +328,16 @@ public extension AnyEntityAuthProvider {
             setImageUrl: { _ in },
             setOrgName: { _ in },
             setOrgSlug: { _ in },
-            setOrgImageUrl: { _ in }
+            setOrgImageUrl: { _ in },
+            listMembers: { _ in [] },
+            removeMember: { _, _ in },
+            inviteSearchUser: { _, _ in nil },
+            invitationsReceived: { _ in [] },
+            invitationsSent: { _ in [] },
+            inviteSend: { _, _, _ in },
+            inviteAccept: { _ in },
+            inviteDecline: { _ in },
+            inviteRevoke: { _ in }
         )
     }
 }

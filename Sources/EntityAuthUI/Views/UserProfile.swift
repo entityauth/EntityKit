@@ -488,6 +488,9 @@ private struct UserProfileSheet: View {
                 .font(.system(.title2, design: .rounded, weight: .semibold))
             
             OrganizationList(onDismiss: nil)
+
+            // Members of active organization
+            ActiveOrgMembersSection()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
@@ -669,6 +672,46 @@ private struct UserProfileSheet: View {
             try await provider.setImageUrl(url.absoluteString)
         } catch {
             print("[UserProfile] Failed to upload/set profile image: \(error)")
+        }
+    }
+}
+
+// MARK: - Active Organization Members Section
+private struct ActiveOrgMembersSection: View {
+    @Environment(\.entityAuthProvider) private var ea
+    @State private var activeOrgId: String?
+    @State private var canManage: Bool = false
+    @State private var meId: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let orgId = activeOrgId {
+                OrganizationMembersList(
+                    orgId: orgId,
+                    canManage: canManage,
+                    currentUserId: meId
+                )
+            }
+        }
+        .task {
+            await loadActive()
+        }
+    }
+
+    private func loadActive() async {
+        do {
+            let snap = await ea.currentSnapshot()
+            meId = snap.userId
+            if let active = try await ea.activeOrganization() {
+                activeOrgId = active.orgId
+                canManage = (active.role.lowercased() == "owner" || active.role.lowercased() == "admin")
+            } else {
+                activeOrgId = nil
+                canManage = false
+            }
+        } catch {
+            activeOrgId = nil
+            canManage = false
         }
     }
 }
@@ -918,290 +961,210 @@ private struct DeleteAccountContent: View {
 
 // MARK: - Invitations Content (Shared)
 private struct InvitationsContent: View {
+    @Environment(\.entityAuthProvider) private var ea
     @Environment(\.colorScheme) private var colorScheme
-    @State private var invitations: [MockInvitation] = []
     @State private var isLoading = false
-    
+    @State private var received: [Invitation] = []
+    @State private var sent: [Invitation] = []
+    @State private var error: String?
+    @State private var searchText: String = ""
+    @State private var foundUser: (id: String, email: String?, username: String?)?
+    @State private var orgsICanInvite: [OrganizationSummary] = []
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if isLoading {
-                loadingView
-            } else if invitations.isEmpty {
-                emptyStateView
-            } else {
-                invitationsListView
-            }
+            inviteSearchSection
+            listsSection
         }
-        .onAppear {
-            // TODO: Load actual invitations from provider
-            // For now, showing mock data for UI demonstration
-            loadMockInvitations()
-        }
+        .onAppear { Task { await loadAll() } }
     }
-    
-    private func loadMockInvitations() {
-        isLoading = true
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            invitations = [
-                MockInvitation(
-                    id: "1",
-                    organizationName: "Acme Corporation",
-                    inviterName: "Sarah Chen",
-                    role: "Member",
-                    invitedAt: Date().addingTimeInterval(-86400 * 2) // 2 days ago
-                ),
-                MockInvitation(
-                    id: "2",
-                    organizationName: "Tech Innovators",
-                    inviterName: "Michael Rodriguez",
-                    role: "Admin",
-                    invitedAt: Date().addingTimeInterval(-3600 * 5) // 5 hours ago
-                ),
-                MockInvitation(
-                    id: "3",
-                    organizationName: "Design Studio Co",
-                    inviterName: "Emma Watson",
-                    role: "Viewer",
-                    invitedAt: Date().addingTimeInterval(-60 * 30) // 30 minutes ago
-                )
-            ]
-            isLoading = false
-        }
-    }
-    
-    private func acceptInvitation(_ invitation: MockInvitation) {
-        withAnimation {
-            invitations.removeAll { $0.id == invitation.id }
-        }
-        // TODO: Implement actual accept logic
-    }
-    
-    private func declineInvitation(_ invitation: MockInvitation) {
-        withAnimation {
-            invitations.removeAll { $0.id == invitation.id }
-        }
-        // TODO: Implement actual decline logic
-    }
-    
-    // MARK: - Loading View
-    
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.2)
-            
-            Text("Loading invitations...")
-                .font(.system(.callout, design: .rounded))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-    }
-    
-    // MARK: - Empty State
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.1))
-                    .frame(width: 80, height: 80)
-                
-                Image("PaperPlace", bundle: .module)
-                    .resizable()
-                    .renderingMode(.original)
-                    .frame(width: 36, height: 36)
-            }
-            
-            // Text
-            VStack(spacing: 8) {
-                Text("No pending invitations")
-                    .font(.system(.title3, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.primary)
-                
-                Text("You'll see organization invitations here when someone invites you to join their team.")
-                    .font(.system(.callout, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-    }
-    
-    // MARK: - Invitations List
-    
-    private var invitationsListView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header with count
-            HStack {
-                Text("\(invitations.count) Pending Invitation\(invitations.count == 1 ? "" : "s")")
-                    .font(.system(.callout, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-            }
-            .padding(.bottom, 4)
-            
-            // Invitations
-            VStack(spacing: 12) {
-                ForEach(invitations) { invitation in
-                    invitationCard(invitation)
-                        .transition(.asymmetric(
-                            insertion: .scale.combined(with: .opacity),
-                            removal: .opacity
-                        ))
+
+    private var inviteSearchSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Invite a user")
+                .font(.system(.headline, design: .rounded, weight: .semibold))
+
+            TextField("", text: $searchText, prompt: Text("Search by email or username"))
+                .textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 8) {
+                Button("Search") {
+                    Task { await search() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if let found = foundUser {
+                    Menu("Invite to...") {
+                        ForEach(orgsICanInvite, id: \.orgId) { org in
+                            Button("\(org.name ?? org.slug ?? org.orgId) (\(org.role))") {
+                                Task { await sendInvite(orgId: org.orgId, inviteeId: found.id) }
+                            }
+                        }
+                    }
+                    .disabled(orgsICanInvite.isEmpty)
                 }
             }
-        }
-    }
-    
-    @ViewBuilder
-    private func invitationCard(_ invitation: MockInvitation) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header with org info
-            HStack(spacing: 12) {
-                // Organization Icon
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 48, height: 48)
-                    
-                    Text(invitation.organizationName.prefix(1).uppercased())
-                        .font(.system(.title3, design: .rounded, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                
-                // Organization Details
+
+            if let found = foundUser {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(invitation.organizationName)
-                        .font(.system(.body, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    
-                    Text("Invited by \(invitation.inviterName)")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                // Role badge
-                Text(invitation.role.uppercased())
-                    .font(.system(.caption2, design: .rounded, weight: .bold))
-                    .foregroundStyle(.blue)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(Color.blue.opacity(0.15))
-                    )
-            }
-            
-            // Timestamp
-            HStack(spacing: 6) {
-                Image(systemName: "clock")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                
-                Text(formatRelativeTime(invitation.invitedAt))
-                    .font(.system(.caption2, design: .rounded))
-                    .foregroundStyle(.tertiary)
-            }
-            
-            // Action Buttons
-            HStack(spacing: 12) {
-                // Decline
-                Button(action: {
-                    declineInvitation(invitation)
-                }) {
-                    Text("Decline")
+                    Text(found.username ?? found.email ?? found.id)
                         .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            Capsule()
-                                .fill(Color.secondary.opacity(0.1))
-                        )
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
-                        )
+                    if let email = found.email {
+                        Text(email)
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .buttonStyle(.plain)
-                
-                // Accept
-                Button(action: {
-                    acceptInvitation(invitation)
-                }) {
-                    Text("Accept")
-                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                        )
-                        .shadow(color: Color.accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .buttonStyle(.plain)
+            }
+
+            if let error {
+                Text(error).foregroundStyle(.red).font(.caption)
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
-                            Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.1 : 0.05), radius: 12, x: 0, y: 4)
     }
-    
-    private func formatRelativeTime(_ date: Date) -> String {
-        let seconds = Date().timeIntervalSince(date)
-        
-        if seconds < 60 {
-            return "Just now"
-        } else if seconds < 3600 {
-            let minutes = Int(seconds / 60)
-            return "\(minutes) minute\(minutes == 1 ? "" : "s") ago"
-        } else if seconds < 86400 {
-            let hours = Int(seconds / 3600)
-            return "\(hours) hour\(hours == 1 ? "" : "s") ago"
-        } else if seconds < 604800 {
-            let days = Int(seconds / 86400)
-            return "\(days) day\(days == 1 ? "" : "s") ago"
-        } else {
-            let weeks = Int(seconds / 604800)
-            return "\(weeks) week\(weeks == 1 ? "" : "s") ago"
+
+    private var listsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Invitations")
+                .font(.system(.headline, design: .rounded, weight: .semibold))
+
+            if isLoading {
+                ProgressView().padding(.vertical, 24)
+            } else {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Received").font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        if received.isEmpty {
+                            roundedInfo("No invitations")
+                        } else {
+                            ForEach(received, id: \.id) { inv in
+                                invitationRow(inv, actions: .received)
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Sent").font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        if sent.isEmpty {
+                            roundedInfo("No invitations sent")
+                        } else {
+                            ForEach(sent, id: \.id) { inv in
+                                invitationRow(inv, actions: .sent)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private enum InvitationActions { case received, sent }
+
+    @ViewBuilder
+    private func invitationRow(_ inv: Invitation, actions: InvitationActions) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Org: \(inv.orgId)")
+                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                Text("Role: \(inv.role) • State: \(inv.state)")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            switch actions {
+            case .received:
+                HStack(spacing: 8) {
+                    Button("Accept") { Task { await accept(inv.id) } }
+                    Button("Decline") { Task { await decline(inv.id) } }.buttonStyle(.bordered)
+                }
+            case .sent:
+                if inv.state == "pending" {
+                    Button("Revoke") { Task { await revoke(inv.id) } }.buttonStyle(.bordered)
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.secondary.opacity(0.1))
+        )
+    }
+
+    @ViewBuilder
+    private func roundedInfo(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.caption, design: .rounded))
+            .foregroundStyle(.secondary)
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.secondary.opacity(0.1))
+            )
+    }
+
+    private func loadAll() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let snap = await ea.currentSnapshot()
+            guard let userId = snap.userId else { return }
+            received = try await ea.invitationsReceived(userId: userId)
+            sent = try await ea.invitationsSent(inviterId: userId)
+            let orgs = try await ea.organizations()
+            orgsICanInvite = orgs.filter { $0.role == "owner" || $0.role == "admin" }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func search() async {
+        error = nil
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        do {
+            if q.contains("@") {
+                foundUser = try await ea.inviteSearchUser(email: q, username: nil)
+            } else {
+                foundUser = try await ea.inviteSearchUser(email: nil, username: q)
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func sendInvite(orgId: String, inviteeId: String) async {
+        do {
+            try await ea.inviteSend(orgId: orgId, inviteeId: inviteeId, role: "member")
+            try await loadAll()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func accept(_ id: String) async {
+        do {
+            try await ea.inviteAccept(invitationId: id)
+            try await loadAll()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func decline(_ id: String) async {
+        do {
+            try await ea.inviteDecline(invitationId: id)
+            try await loadAll()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func revoke(_ id: String) async {
+        do {
+            try await ea.inviteRevoke(invitationId: id)
+            try await loadAll()
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 }
