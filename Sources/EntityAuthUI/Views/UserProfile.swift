@@ -8,18 +8,15 @@ import AppKit
 
 /// Feature flags for user profile sections
 public struct UserProfileFeatureFlags: Sendable {
-    public let showInvitations: Bool
     public let showPreferences: Bool
     public let showSecurity: Bool
     public let showDeleteAccount: Bool
     
     public init(
-        showInvitations: Bool = false,
         showPreferences: Bool = false,
         showSecurity: Bool = false,
         showDeleteAccount: Bool = false
     ) {
-        self.showInvitations = showInvitations
         self.showPreferences = showPreferences
         self.showSecurity = showSecurity
         self.showDeleteAccount = showDeleteAccount
@@ -30,7 +27,6 @@ public struct UserProfileFeatureFlags: Sendable {
     
     /// All sections enabled for development
     public static let development = UserProfileFeatureFlags(
-        showInvitations: true,
         showPreferences: true,
         showSecurity: true,
         showDeleteAccount: true
@@ -128,11 +124,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
     
     /// Returns sections that should be visible based on feature flags
     static func visibleSections(with flags: UserProfileFeatureFlags) -> [ProfileSection] {
-        var sections: [ProfileSection] = [.account, .organizations]
+        var sections: [ProfileSection] = [.account, .organizations, .invitations]
         
-        if flags.showInvitations {
-            sections.append(.invitations)
-        }
         if flags.showPreferences {
             sections.append(.preferences)
         }
