@@ -35,6 +35,7 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _removeMember: @Sendable (_ orgId: String, _ userId: String) async throws -> Void
     // Invitations
     private let _inviteSearchUser: @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?
+    private let _inviteSearchUsers: @Sendable (_ q: String) async throws -> [(id: String, email: String?, username: String?)]
     private let _invitationsReceived: @Sendable (_ userId: String) async throws -> [Invitation]
     private let _invitationsSent: @Sendable (_ inviterId: String) async throws -> [Invitation]
     private let _inviteSend: @Sendable (_ orgId: String, _ inviteeId: String, _ role: String) async throws -> Void
@@ -69,6 +70,7 @@ public struct AnyEntityAuthProvider: Sendable {
         listMembers: @escaping @Sendable (_ orgId: String) async throws -> [OrgMemberDTO],
         removeMember: @escaping @Sendable (_ orgId: String, _ userId: String) async throws -> Void,
         inviteSearchUser: @escaping @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?,
+        inviteSearchUsers: @escaping @Sendable (_ q: String) async throws -> [(id: String, email: String?, username: String?)],
         invitationsReceived: @escaping @Sendable (_ userId: String) async throws -> [Invitation],
         invitationsSent: @escaping @Sendable (_ inviterId: String) async throws -> [Invitation],
         inviteSend: @escaping @Sendable (_ orgId: String, _ inviteeId: String, _ role: String) async throws -> Void,
@@ -102,6 +104,7 @@ public struct AnyEntityAuthProvider: Sendable {
         self._listMembers = listMembers
         self._removeMember = removeMember
         self._inviteSearchUser = inviteSearchUser
+        self._inviteSearchUsers = inviteSearchUsers
         self._invitationsReceived = invitationsReceived
         self._invitationsSent = invitationsSent
         self._inviteSend = inviteSend
@@ -136,6 +139,7 @@ public struct AnyEntityAuthProvider: Sendable {
     public func listMembers(orgId: String) async throws -> [OrgMemberDTO] { try await _listMembers(orgId) }
     public func removeMember(orgId: String, userId: String) async throws { try await _removeMember(orgId, userId) }
     public func inviteSearchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? { try await _inviteSearchUser(email, username) }
+    public func inviteSearchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] { try await _inviteSearchUsers(q) }
     public func invitationsReceived(userId: String) async throws -> [Invitation] { try await _invitationsReceived(userId) }
     public func invitationsSent(inviterId: String) async throws -> [Invitation] { try await _invitationsSent(inviterId) }
     public func inviteSend(orgId: String, inviteeId: String, role: String) async throws { try await _inviteSend(orgId, inviteeId, role) }
@@ -183,6 +187,7 @@ public extension AnyEntityAuthProvider {
             listMembers: { orgId in try await facade.listOrganizationMembers(orgId: orgId) },
             removeMember: { orgId, userId in try await facade.removeOrganizationMember(orgId: orgId, userId: userId) },
             inviteSearchUser: { email, username in try await facade.searchUser(email: email, username: username) },
+            inviteSearchUsers: { q in try await facade.searchUsers(q: q) },
             invitationsReceived: { userId in try await facade.listInvitationsReceived(for: userId) },
             invitationsSent: { inviterId in try await facade.listInvitationsSent(by: inviterId) },
             inviteSend: { orgId, inviteeId, role in try await facade.sendInvitation(orgId: orgId, inviteeId: inviteeId, role: role) },
@@ -252,6 +257,7 @@ public extension AnyEntityAuthProvider {
             listMembers: { _ in [] },
             removeMember: { _, _ in },
             inviteSearchUser: { _, _ in nil },
+            inviteSearchUsers: { _ in [] },
             invitationsReceived: { _ in [] },
             invitationsSent: { _ in [] },
             inviteSend: { _, _, _ in },
@@ -332,6 +338,7 @@ public extension AnyEntityAuthProvider {
             listMembers: { _ in [] },
             removeMember: { _, _ in },
             inviteSearchUser: { _, _ in nil },
+            inviteSearchUsers: { _ in [] },
             invitationsReceived: { _ in [] },
             invitationsSent: { _ in [] },
             inviteSend: { _, _, _ in },

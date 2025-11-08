@@ -591,6 +591,9 @@ public actor EntityAuthFacade {
     public func searchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? {
         try await dependencies.invitationService.findUser(email: email, username: username)
     }
+    public func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] {
+        try await dependencies.invitationService.findUsers(q: q)
+    }
     public func listInvitationsReceived(for userId: String) async throws -> [Invitation] {
         try await dependencies.invitationService.listReceived(for: userId)
     }

@@ -968,8 +968,10 @@ private struct InvitationsContent: View {
     @State private var sent: [Invitation] = []
     @State private var error: String?
     @State private var searchText: String = ""
-    @State private var foundUser: (id: String, email: String?, username: String?)?
+    @State private var foundUsers: [(id: String, email: String?, username: String?)] = []
+    @State private var searchTask: Task<Void, Never>?
     @State private var orgsICanInvite: [OrganizationSummary] = []
+    @State private var orgNameForId: [String: String] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -977,6 +979,13 @@ private struct InvitationsContent: View {
             listsSection
         }
         .onAppear { Task { await loadAll() } }
+        // Event-driven refresh via realtime snapshot stream
+        .task {
+            let stream = await ea.snapshotStream()
+            for await _ in stream {
+                await loadAll()
+            }
+        }
     }
 
     private var inviteSearchSection: some View {
@@ -986,34 +995,48 @@ private struct InvitationsContent: View {
 
             TextField("", text: $searchText, prompt: Text("Search by email or username"))
                 .textFieldStyle(.roundedBorder)
-
-            HStack(spacing: 8) {
-                Button("Search") {
-                    Task { await search() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                if let found = foundUser {
-                    Menu("Invite to...") {
-                        ForEach(orgsICanInvite, id: \.orgId) { org in
-                            Button("\(org.name ?? org.slug ?? org.orgId) (\(org.role))") {
-                                Task { await sendInvite(orgId: org.orgId, inviteeId: found.id) }
-                            }
-                        }
+                .onChange(of: searchText) { _, newValue in
+                    searchTask?.cancel()
+                    let q = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if q.isEmpty {
+                        foundUsers = []
+                        return
                     }
-                    .disabled(orgsICanInvite.isEmpty)
+                    searchTask = Task {
+                        try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
+                        if Task.isCancelled { return }
+                        await search()
+                    }
                 }
-            }
 
-            if let found = foundUser {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(found.username ?? found.email ?? found.id)
-                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    if let email = found.email {
-                        Text(email)
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.secondary)
+            if !foundUsers.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(foundUsers, id: \.id) { user in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(user.username ?? user.email ?? user.id)
+                                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                if let email = user.email {
+                                    Text(email)
+                                        .font(.system(.caption, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Menu("Invite to...") {
+                                ForEach(orgsICanInvite, id: \.orgId) { org in
+                                    Button("\(org.name ?? org.slug ?? org.orgId) (\(org.role))") {
+                                        Task { await sendInvite(orgId: org.orgId, inviteeId: user.id) }
+                                    }
+                                }
+                            }
+                            .disabled(orgsICanInvite.isEmpty)
+                        }
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.secondary.opacity(0.1))
+                        )
                     }
                 }
             }
@@ -1064,7 +1087,7 @@ private struct InvitationsContent: View {
     private func invitationRow(_ inv: Invitation, actions: InvitationActions) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Org: \(inv.orgId)")
+                Text("Org: \(orgNameForId[inv.orgId] ?? inv.orgId)")
                     .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 Text("Role: \(inv.role) • State: \(inv.state)")
                     .font(.system(.caption, design: .rounded))
@@ -1112,6 +1135,9 @@ private struct InvitationsContent: View {
             sent = try await ea.invitationsSent(inviterId: userId)
             let orgs = try await ea.organizations()
             orgsICanInvite = orgs.filter { $0.role == "owner" || $0.role == "admin" }
+            orgNameForId = Dictionary(uniqueKeysWithValues: orgs.map { org in
+                (org.orgId, (org.name ?? org.slug ?? org.orgId))
+            })
         } catch {
             self.error = error.localizedDescription
         }
@@ -1122,11 +1148,8 @@ private struct InvitationsContent: View {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return }
         do {
-            if q.contains("@") {
-                foundUser = try await ea.inviteSearchUser(email: q, username: nil)
-            } else {
-                foundUser = try await ea.inviteSearchUser(email: nil, username: q)
-            }
+            let users = try await ea.inviteSearchUsers(q: q)
+            foundUsers = users
         } catch {
             self.error = error.localizedDescription
         }

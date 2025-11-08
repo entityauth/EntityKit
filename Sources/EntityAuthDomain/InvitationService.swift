@@ -18,6 +18,7 @@ public protocol InvitationsProviding: Sendable {
     func decline(invitationId: String) async throws
     func revoke(invitationId: String) async throws
     func findUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)?
+    func findUsers(q: String) async throws -> [(id: String, email: String?, username: String?)]
 }
 
 public final class InvitationService: InvitationsProviding {
@@ -42,6 +43,18 @@ public final class InvitationService: InvitationsProviding {
         guard let id = result?._id else { return nil }
         return (id, result?.properties?.email, result?.properties?.username)
     }
+  
+  public func findUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] {
+    let body: [String: Any] = ["q": q]
+    let data = try JSONSerialization.data(withJSONObject: body)
+    let req = APIRequest(method: .post, path: "/api/users/search", body: data)
+    struct Raw: Decodable { let _id: String?; let properties: Props?; struct Props: Decodable { let email: String?; let username: String? } }
+    let rows = try await client.send(req, decode: [Raw].self)
+    return rows.compactMap { r in
+      guard let id = r._id else { return nil }
+      return (id, r.properties?.email, r.properties?.username)
+    }
+  }
     
     public func listReceived(for userId: String) async throws -> [Invitation] {
         let req = APIRequest(
