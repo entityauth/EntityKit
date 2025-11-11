@@ -4,17 +4,19 @@ import Combine
 @testable import EntityKit
 
 final class AuthStateTests: XCTestCase {
-    func testUpdateAndClearTokens() throws {
+    func testUpdateAndClearTokens() async throws {
         let store = InMemoryTokenStore()
         let state = AuthState(tokenStore: store)
 
-        try state.update(accessToken: "a1", refreshToken: "r1")
-        XCTAssertEqual(state.currentTokens.accessToken, "a1")
-        XCTAssertEqual(state.currentTokens.refreshToken, "r1")
+        try await state.update(accessToken: "a1", refreshToken: "r1")
+        let tokens1 = await state.currentTokens
+        XCTAssertEqual(tokens1.accessToken, "a1")
+        XCTAssertEqual(tokens1.refreshToken, "r1")
 
-        try state.clear()
-        XCTAssertNil(state.currentTokens.accessToken)
-        XCTAssertNil(state.currentTokens.refreshToken)
+        try await state.clear()
+        let tokens2 = await state.currentTokens
+        XCTAssertNil(tokens2.accessToken)
+        XCTAssertNil(tokens2.refreshToken)
     }
 }
 
@@ -32,8 +34,9 @@ final class TokenRefresherTests: XCTestCase {
         let (d1, d2) = try await (r1, r2)
         XCTAssertEqual(String(decoding: d1, as: UTF8.self), "ok")
         XCTAssertEqual(String(decoding: d2, as: UTF8.self), "ok")
-        XCTAssertEqual(state.currentTokens.accessToken, "a2")
-        XCTAssertEqual(state.currentTokens.refreshToken, "r2")
+        let finalTokens = await state.currentTokens
+        XCTAssertEqual(finalTokens.accessToken, "a2")
+        XCTAssertEqual(finalTokens.refreshToken, "r2")
         XCTAssertEqual(service.refreshCallCount, 1)
     }
 }
@@ -50,7 +53,7 @@ final class APIClientTests: XCTestCase {
     func testHeadersAndSuccess() async throws {
         let config = EntityAuthConfig(environment: .custom(URL(string: "https://api.test")!), workspaceTenantId: "w1", clientIdentifier: "ios")
         let state = AuthState(tokenStore: InMemoryTokenStore())
-        try state.update(accessToken: "token", refreshToken: nil)
+        try await state.update(accessToken: "token", refreshToken: nil)
         let refresher = TokenRefresher(authState: state, refreshService: MockRefreshService(result: .failure(.refreshFailed)))
         let sessionConfig = URLSessionConfiguration.ephemeral
         sessionConfig.protocolClasses = [URLProtocolMock.self]
@@ -69,7 +72,7 @@ final class APIClientTests: XCTestCase {
     func test401ThenRefreshThenRetry() async throws {
         let config = EntityAuthConfig(environment: .custom(URL(string: "https://api.test")!))
         let state = AuthState(tokenStore: InMemoryTokenStore())
-        try state.update(accessToken: "t0", refreshToken: "r0")
+        try await state.update(accessToken: "t0", refreshToken: "r0")
         let service = MockRefreshService(result: .success(.init(accessToken: "t1", refreshToken: "r1")))
         let refresher = TokenRefresher(authState: state, refreshService: service)
         let sessionConfig = URLSessionConfiguration.ephemeral
@@ -88,8 +91,9 @@ final class APIClientTests: XCTestCase {
         let client = APIClient(config: config, authState: state, urlSession: session, decoder: JSONDecoder(), encoder: JSONEncoder(), refreshHandler: refresher)
         let data = try await client.send(APIRequest(method: .get, path: "/retry"))
         XCTAssertEqual(String(decoding: data, as: UTF8.self), "ok")
-        XCTAssertEqual(state.currentTokens.accessToken, "t1")
-        XCTAssertEqual(state.currentTokens.refreshToken, "r1")
+        let finalTokens = await state.currentTokens
+        XCTAssertEqual(finalTokens.accessToken, "t1")
+        XCTAssertEqual(finalTokens.refreshToken, "r1")
         XCTAssertEqual(service.refreshCallCount, 1)
     }
 }

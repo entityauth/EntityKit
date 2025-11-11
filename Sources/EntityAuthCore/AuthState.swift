@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-public final class AuthState: @unchecked Sendable {
+public actor AuthState {
     public struct Tokens: Equatable, Sendable {
         public var accessToken: String?
         public var refreshToken: String?
@@ -13,15 +13,15 @@ public final class AuthState: @unchecked Sendable {
     }
 
     private let tokenStore: TokenStoring
-    private let queue = DispatchQueue(label: "com.entityauth.AuthState", qos: .userInitiated)
-    private let subject: CurrentValueSubject<Tokens, Never>
+    private nonisolated(unsafe) let subject: CurrentValueSubject<Tokens, Never>
+    private var _currentTokens: Tokens
 
-    public var tokensPublisher: AnyPublisher<Tokens, Never> {
+    public nonisolated var tokensPublisher: AnyPublisher<Tokens, Never> {
         subject.eraseToAnyPublisher()
     }
 
     public var currentTokens: Tokens {
-        subject.value
+        _currentTokens
     }
 
     public init(tokenStore: TokenStoring) {
@@ -31,29 +31,30 @@ public final class AuthState: @unchecked Sendable {
             let refresh = try? tokenStore.loadRefreshToken()
             return Tokens(accessToken: access, refreshToken: refresh)
         }()
+        self._currentTokens = tokens
         self.subject = CurrentValueSubject(tokens)
     }
 
     public func update(accessToken: String?, refreshToken: String?) throws {
-        try queue.sync {
-            try tokenStore.save(accessToken: accessToken)
-            try tokenStore.save(refreshToken: refreshToken)
-            subject.send(Tokens(accessToken: accessToken, refreshToken: refreshToken))
-        }
+        try tokenStore.save(accessToken: accessToken)
+        try tokenStore.save(refreshToken: refreshToken)
+        let newTokens = Tokens(accessToken: accessToken, refreshToken: refreshToken)
+        _currentTokens = newTokens
+        subject.send(newTokens)
     }
 
     public func update(accessToken: String?) throws {
-        try queue.sync {
-            try tokenStore.save(accessToken: accessToken)
-            let refresh = try tokenStore.loadRefreshToken()
-            subject.send(Tokens(accessToken: accessToken, refreshToken: refresh))
-        }
+        try tokenStore.save(accessToken: accessToken)
+        let refresh = try tokenStore.loadRefreshToken()
+        let newTokens = Tokens(accessToken: accessToken, refreshToken: refresh)
+        _currentTokens = newTokens
+        subject.send(newTokens)
     }
 
     public func clear() throws {
-        try queue.sync {
-            try tokenStore.clear()
-            subject.send(Tokens(accessToken: nil, refreshToken: nil))
-        }
+        try tokenStore.clear()
+        let clearedTokens = Tokens(accessToken: nil, refreshToken: nil)
+        _currentTokens = clearedTokens
+        subject.send(clearedTokens)
     }
 }

@@ -63,7 +63,7 @@ public final class APIClient: APIClientType, @unchecked Sendable {
     }
 
     private func perform(request: APIRequest, retryingOn401: Bool) async throws -> Data {
-        let urlRequest = try makeURLRequest(for: request)
+        let urlRequest = try await makeURLRequest(for: request)
         if EntityAuthDebugLog.enabled {
             print("[APIClient]", urlRequest.httpMethod ?? "", urlRequest.url?.absoluteString ?? "")
         }
@@ -98,7 +98,7 @@ public final class APIClient: APIClientType, @unchecked Sendable {
         }
     }
 
-    private func makeURLRequest(for request: APIRequest) throws -> URLRequest {
+    private func makeURLRequest(for request: APIRequest) async throws -> URLRequest {
         guard var components = URLComponents(url: config.baseURL, resolvingAgainstBaseURL: false) else {
             throw EntityAuthError.configurationMissingBaseURL
         }
@@ -113,7 +113,7 @@ public final class APIClient: APIClientType, @unchecked Sendable {
         
         // Build headers: always include client headers, add auth if required
         var headers = clientHeaders()
-        if request.requiresAuthentication, let accessToken = authState.currentTokens.accessToken {
+        if request.requiresAuthentication, let accessToken = await authState.currentTokens.accessToken {
             headers["authorization"] = "Bearer \(accessToken)"
         }
         

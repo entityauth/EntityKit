@@ -39,7 +39,7 @@ public final class AuthService: AuthProviding, RefreshService {
 
     public func refresh() async throws -> RefreshResponse {
         var headers: [String: String] = ["content-type": "application/json"]
-        if let refreshToken = authState.currentTokens.refreshToken {
+        if let refreshToken = await authState.currentTokens.refreshToken {
             headers["x-refresh-token"] = refreshToken
         }
         let apiRequest = APIRequest(method: .post, path: "/api/auth/refresh", headers: headers, requiresAuthentication: false)

@@ -55,7 +55,7 @@ public protocol BaseURLPersisting: Sendable {
 
 public struct UserDefaultsBaseURLStore: BaseURLPersisting, @unchecked Sendable {
     private let key = "com.entityauth.baseURL"
-    private let defaults: UserDefaults
+    private nonisolated(unsafe) let defaults: UserDefaults
 
     public init(suiteName: String?) {
         if let suiteName {

@@ -32,7 +32,7 @@ public actor TokenRefresher: TokenRefreshHandling {
         let task = Task { () throws -> Data in
             do {
                 let response = try await refreshService.refresh()
-                try authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
+                try await authState.update(accessToken: response.accessToken, refreshToken: response.refreshToken)
                 return try await operationCopy()
             } catch let error as EntityAuthError {
                 throw error
