@@ -149,7 +149,11 @@ public struct AnyEntityAuthProvider: Sendable {
 }
 
 public extension AnyEntityAuthProvider {
-    static func live(facade: EntityAuthFacade, config: EntityAuthConfig) -> AnyEntityAuthProvider {
+    static func live(
+        facade: EntityAuthFacade,
+        config: EntityAuthConfig,
+        onSwitchOrg: (@Sendable (_ orgId: String) async throws -> Void)? = nil
+    ) -> AnyEntityAuthProvider {
         return AnyEntityAuthProvider(
             stream: { await facade.snapshotStream() },
             current: { await facade.currentSnapshot() },
@@ -175,7 +179,13 @@ public extension AnyEntityAuthProvider {
             rpId: { config.rpId },
             origins: { config.origins },
             logout: { try await facade.logout() },
-            switchOrg: { orgId in try await facade.switchOrg(orgId: orgId) },
+            switchOrg: { orgId in
+                if let customSwitch = onSwitchOrg {
+                    try await customSwitch(orgId)
+                } else {
+                    try await facade.switchOrg(orgId: orgId)
+                }
+            },
             createOrg: { name, slug, ownerId in try await facade.createOrganization(name: name, slug: slug, ownerId: ownerId) },
             activeOrg: { try await facade.activeOrganization() },
             setUsername: { value in try await facade.setUsername(value) },
