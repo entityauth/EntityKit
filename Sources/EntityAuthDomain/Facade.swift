@@ -1119,12 +1119,12 @@ extension EntityAuthFacade {
                         do {
                             let identity = (email: snapshot.email, username: snapshot.username)
                             try await ensureOrganizationAndActivateIfMissing(usingIdentity: identity)
-                            print("[EntityAuth][initializeAsync] Step 4: ensureOrganizationAndActivateIfMissing() completed")
+                        print("[EntityAuth][initializeAsync] Step 4: ensureOrganizationAndActivateIfMissing() completed")
                             print("[EntityAuth][initializeAsync] Step 5: Refreshing user data after org creation...")
                             try await refreshUserData()
                             print("[EntityAuth][initializeAsync] Step 5: refreshUserData() SUCCESS")
-                        } catch {
-                            print("[EntityAuth][initializeAsync] Step 4 ERROR: ensureOrganizationAndActivateIfMissing() FAILED: \(error)")
+                    } catch {
+                        print("[EntityAuth][initializeAsync] Step 4 ERROR: ensureOrganizationAndActivateIfMissing() FAILED: \(error)")
                             // Continue - org might already exist or will be created later
                         }
                     } else {
@@ -1142,9 +1142,9 @@ extension EntityAuthFacade {
                             snapshot.accessToken = newToken
                             print("[EntityAuth][initializeAsync] Step 6: Switched to org \(firstOrg), refreshing user data...")
                             // Refresh again after switch to update activeOrganization
-                            try await refreshUserData()
+                        try await refreshUserData()
                             print("[EntityAuth][initializeAsync] Step 6: refreshUserData() after switch SUCCESS")
-                        } catch {
+                    } catch {
                             print("[EntityAuth][initializeAsync] Step 6 ERROR: switchOrg/refreshUserData FAILED: \(error)")
                             // Continue - might still work with existing token
                         }
