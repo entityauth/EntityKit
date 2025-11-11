@@ -153,6 +153,7 @@ public actor EntityAuthFacade {
     // Coalescing support to avoid emitting half-hydrated snapshots
     private var emitSuppressionCount: Int = 0
     private var hasPendingEmission: Bool = false
+    private var onAuthenticatedCallback: ((Snapshot) -> Void)?
 
     public var snapshotPublisher: AnyPublisher<Snapshot, Never> {
         subject.eraseToAnyPublisher()
@@ -177,6 +178,10 @@ public actor EntityAuthFacade {
         )
         self.subject = CurrentValueSubject(snapshot)
         Task { await self.initializeAsync() }
+    }
+    
+    public func setOnAuthenticated(_ callback: @escaping @Sendable (Snapshot) -> Void) {
+        onAuthenticatedCallback = callback
     }
 
     public init(dependencies: Dependencies, state: Snapshot) {
@@ -743,21 +748,40 @@ public actor EntityAuthFacade {
         }
     }
 
-    private func refreshUserData() async throws {
+    private func refreshUserData(userId: String? = nil) async throws {
         print("[EntityAuth][refreshUserData] BEGIN")
-        print("[EntityAuth][refreshUserData] About to fetch organizations...")
         
+        // Use bootstrap endpoint for optimal performance (single roundtrip)
         do {
-            let organizations = try await dependencies.organizationService.list().map { $0.asDomain }
-            print("[EntityAuth][refreshUserData] Successfully fetched \(organizations.count) organizations: \(organizations.map { "\($0.orgId):\($0.name ?? "unnamed")" }.joined(separator: ", "))")
+            let bootstrap = try await dependencies.organizationService.bootstrap()
+            
+            // Update identity from bootstrap response
+            snapshot.userId = bootstrap.user.id
+            snapshot.username = bootstrap.user.username
+            snapshot.email = bootstrap.user.email
+            snapshot.imageUrl = bootstrap.user.imageUrl
+            
+            // Update organizations - map BootstrapResponse.Organization to OrganizationSummary
+            let organizations = bootstrap.organizations.map { org in
+                OrganizationSummary(
+                    orgId: org.orgId,
+                    name: org.name,
+                    slug: org.slug,
+                    memberCount: org.memberCount,
+                    role: org.role,
+                    joinedAt: org.joinedAt,
+                    workspaceTenantId: org.workspaceTenantId
+                )
+            }
             snapshot.organizations = organizations
+            print("[EntityAuth][refreshUserData] Successfully fetched \(organizations.count) organizations: \(organizations.map { "\($0.orgId):\($0.name ?? "unnamed")" }.joined(separator: ", "))")
             
-            // Derive active org from token `oid` claim
-            let tokenOid = currentActiveOrgIdFromAccessToken()
-            print("[EntityAuth][refreshUserData] Token oid=\(tokenOid ?? "nil")")
+            // Derive active org from bootstrap response or token `oid` claim
+            let activeOrgId = bootstrap.activeOrganizationId ?? currentActiveOrgIdFromAccessToken()
+            print("[EntityAuth][refreshUserData] Active org id=\(activeOrgId ?? "nil")")
             
-            if let oid = tokenOid, let matched = organizations.first(where: { $0.orgId == oid }) {
-                print("[EntityAuth][refreshUserData] Matched token oid to org: \(matched.orgId)")
+            if let oid = activeOrgId, let matched = organizations.first(where: { $0.orgId == oid }) {
+                print("[EntityAuth][refreshUserData] Matched active org: \(matched.orgId)")
                 snapshot.activeOrganization = ActiveOrganization(
                     orgId: matched.orgId,
                     name: matched.name,
@@ -768,7 +792,7 @@ public actor EntityAuthFacade {
                     workspaceTenantId: matched.workspaceTenantId,
                     description: nil
                 )
-            } else if let oid = tokenOid {
+            } else if let oid = activeOrgId {
                 print("[EntityAuth][refreshUserData] Token has oid=\(oid) but NO matching org in list - creating minimal ActiveOrganization")
                 snapshot.activeOrganization = ActiveOrganization(
                     orgId: oid,
@@ -781,59 +805,66 @@ public actor EntityAuthFacade {
                     description: nil
                 )
             } else {
-                print("[EntityAuth][refreshUserData] WARNING: Token has NO oid claim and \(organizations.count) org(s) exist - setting activeOrganization=nil")
+                print("[EntityAuth][refreshUserData] WARNING: No active org id and \(organizations.count) org(s) exist - setting activeOrganization=nil")
                 snapshot.activeOrganization = nil
             }
         } catch {
-            print("[EntityAuth][refreshUserData] ERROR: Failed to fetch organizations: \(error)")
+            print("[EntityAuth][refreshUserData] ERROR: Bootstrap failed: \(error)")
             print("[EntityAuth][refreshUserData] Error type: \(type(of: error))")
-            if let nsError = error as NSError? {
-                print("[EntityAuth][refreshUserData] NSError domain=\(nsError.domain) code=\(nsError.code) userInfo=\(nsError.userInfo)")
-            }
             
-            // If 404, user was deleted - clear all auth state
-            if case let EntityAuthError.network(status, _) = error, status == 404 {
-                print("[EntityAuth][refreshUserData] User not found (404) - clearing tokens")
-                try? authState.clear()
-                snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, email: nil, imageUrl: nil, organizations: [], activeOrganization: nil)
-                emit()
-                await dependencies.realtime.stop()
-                lastUserStore.clear()
-                print("[EntityAuth][refreshUserData] Auth cleared due to deleted user")
-                return // Exit early
-            }
-            
-            throw error // Re-throw so caller knows it failed
+            // Fallback to legacy flow if bootstrap fails
+            print("[EntityAuth][refreshUserData] Falling back to legacy flow...")
+            try await refreshUserDataLegacy(userId: userId)
+            return
         }
         
-        // Also hydrate identity (email, username, image) to ensure snapshot is complete post-SSO/login
-        do {
+        print("[EntityAuth][refreshUserData] END orgs=\(snapshot.organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil")")
+        emit()
+    }
+    
+    private func refreshUserDataLegacy(userId: String? = nil) async throws {
+        // Legacy fallback: use separate calls
+        let organizations = try await dependencies.organizationService.list(userId: userId).map { $0.asDomain }
+        snapshot.organizations = organizations
+        
+        let tokenOid = currentActiveOrgIdFromAccessToken()
+        if let oid = tokenOid, let matched = organizations.first(where: { $0.orgId == oid }) {
+            snapshot.activeOrganization = ActiveOrganization(
+                orgId: matched.orgId,
+                name: matched.name,
+                slug: matched.slug,
+                memberCount: matched.memberCount,
+                role: matched.role,
+                joinedAt: matched.joinedAt,
+                workspaceTenantId: matched.workspaceTenantId,
+                description: nil
+            )
+        } else if let oid = tokenOid {
+            snapshot.activeOrganization = ActiveOrganization(
+                orgId: oid,
+                name: nil,
+                slug: nil,
+                memberCount: nil,
+                role: "",
+                joinedAt: 0,
+                workspaceTenantId: nil,
+                description: nil
+            )
+        } else {
+            snapshot.activeOrganization = nil
+        }
+        
+        // Update identity if userId provided, otherwise fetch
+        if let userId = userId {
+            snapshot.userId = userId
+        } else {
             let req = APIRequest(method: .get, path: "/api/user/me")
             let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
             snapshot.userId = me.id
             snapshot.username = me.username
             snapshot.email = me.email
             snapshot.imageUrl = me.imageUrl
-            print("[EntityAuth][refreshUserData] Updated identity: userId=\(me.id) email=\(me.email ?? "nil")")
-        } catch {
-            print("[EntityAuth][refreshUserData] WARNING: Failed to fetch /api/user/me: \(error) - keeping prior identity")
-            
-            // If 404, user was deleted - clear all auth state
-            if case let EntityAuthError.network(status, _) = error, status == 404 {
-                print("[EntityAuth][refreshUserData] User not found (404) in /api/user/me - clearing tokens")
-                try? authState.clear()
-                snapshot = Snapshot(accessToken: nil, refreshToken: nil, sessionId: nil, userId: nil, username: nil, email: nil, imageUrl: nil, organizations: [], activeOrganization: nil)
-                emit()
-                await dependencies.realtime.stop()
-                lastUserStore.clear()
-                print("[EntityAuth][refreshUserData] Auth cleared due to deleted user")
-                return // Exit early
-            }
-            // Non-fatal for other errors; keep prior identity fields if request fails
         }
-        
-        print("[EntityAuth][refreshUserData] END orgs=\(snapshot.organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil")")
-        emit()
     }
 
     // MARK: - Org bootstrap (parity with web)
@@ -1031,37 +1062,34 @@ extension EntityAuthFacade {
         }
         // Eagerly hydrate userId on cold start if tokens are present
         if dependencies.authState.currentTokens.accessToken != nil || dependencies.authState.currentTokens.refreshToken != nil {
-            print("[EntityAuth][initializeAsync] Tokens present - starting hydration sequence")
+            print("[EntityAuth][initializeAsync] Tokens present - starting optimized hydration sequence")
             do {
                 try await coalesced {
-                    do {
-                        print("[EntityAuth][initializeAsync] Step 1: Check if token expiring soon...")
-                        let access = dependencies.authState.currentTokens.accessToken
-                        if let access, isAccessTokenExpiringSoon(access) {
-                            print("[EntityAuth][initializeAsync] Token expiring soon - refreshing...")
-                            let refreshed = try await dependencies.authService.refresh()
-                            print("[EntityAuth][initializeAsync] Refresh succeeded, updating authState...")
-                            do {
-                                try dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
-                                snapshot.accessToken = refreshed.accessToken
-                                snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
-                                print("[EntityAuth][initializeAsync] AuthState updated successfully - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
-                            } catch {
-                                print("[EntityAuth][initializeAsync] CRITICAL ERROR: Failed to update authState after successful refresh: \(error)")
-                                throw error // Propagate the error instead of silently continuing with stale tokens
-                            }
-                        } else {
-                            print("[EntityAuth][initializeAsync] Token not expiring soon, using existing")
+                    // Step 1: Check if token expiring soon and refresh if needed
+                    print("[EntityAuth][initializeAsync] Step 1: Check if token expiring soon...")
+                    let access = dependencies.authState.currentTokens.accessToken
+                    if let access, isAccessTokenExpiringSoon(access) {
+                        print("[EntityAuth][initializeAsync] Token expiring soon - refreshing...")
+                        let refreshed = try await dependencies.authService.refresh()
+                        print("[EntityAuth][initializeAsync] Refresh succeeded, updating authState...")
+                        do {
+                            try dependencies.authState.update(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken)
+                            snapshot.accessToken = refreshed.accessToken
+                            snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
+                            print("[EntityAuth][initializeAsync] AuthState updated successfully - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
+                        } catch {
+                            print("[EntityAuth][initializeAsync] CRITICAL ERROR: Failed to update authState after successful refresh: \(error)")
+                            throw error
                         }
-                        
-                        print("[EntityAuth][initializeAsync] Step 2: Fetching userId from /api/user/me...")
-                        let req = APIRequest(method: .get, path: "/api/user/me")
-                        let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
-                        snapshot.userId = me.id
-                        snapshot.username = me.username
-                        snapshot.email = me.email
-                        snapshot.imageUrl = me.imageUrl
-                        print("[EntityAuth][initializeAsync] Step 2: Got userId=\(me.id) email=\(me.email ?? "nil")")
+                    } else {
+                        print("[EntityAuth][initializeAsync] Token not expiring soon, using existing")
+                    }
+                    
+                    // Step 2: Use bootstrap endpoint to fetch identity + orgs in single call
+                    print("[EntityAuth][initializeAsync] Step 2: Fetching user data via bootstrap endpoint...")
+                    do {
+                        try await refreshUserData()
+                        print("[EntityAuth][initializeAsync] Step 2: Bootstrap SUCCESS - userId=\(snapshot.userId ?? "nil") orgs=\(snapshot.organizations.count)")
                     } catch {
                         print("[EntityAuth][initializeAsync] Step 2 ERROR: \(error)")
                         print("[EntityAuth][initializeAsync] Error type: \(type(of: error))")
@@ -1075,10 +1103,10 @@ extension EntityAuthFacade {
                             await dependencies.realtime.stop()
                             lastUserStore.clear()
                             print("[EntityAuth][initializeAsync] Auth cleared due to deleted user")
-                            return // Exit early - don't continue hydration
+                            return
                         }
                         
-                        // If failure indicates expired/invalid access token, attempt one refresh then retry hydration
+                        // If failure indicates expired/invalid access token, attempt one refresh then retry
                         if shouldAttemptRefresh(after: error) {
                             print("[EntityAuth][initializeAsync] Attempting token refresh due to error...")
                             do {
@@ -1088,81 +1116,60 @@ extension EntityAuthFacade {
                                 snapshot.accessToken = refreshed.accessToken
                                 snapshot.refreshToken = refreshed.refreshToken ?? snapshot.refreshToken
                                 print("[EntityAuth][initializeAsync] Retry authState updated - new oid=\(currentActiveOrgIdFromAccessToken() ?? "nil")")
-                                let req = APIRequest(method: .get, path: "/api/user/me")
-                                let me = try await dependencies.apiClient.send(req, decode: UserResponse.self)
-                                snapshot.userId = me.id
-                                snapshot.username = me.username
-                                snapshot.email = me.email
-                                snapshot.imageUrl = me.imageUrl
-                                print("[EntityAuth][initializeAsync] Retry successful: userId=\(me.id)")
+                                try await refreshUserData()
+                                print("[EntityAuth][initializeAsync] Retry bootstrap successful")
                             } catch {
                                 print("[EntityAuth][initializeAsync] Retry FAILED: \(error) - Error type: \(type(of: error))")
                             }
                         }
                     }
                     
-                    // Step 3: Hydrate org state and identity in one pass
-                    print("[EntityAuth][initializeAsync] Step 3: Refreshing user data (orgs + identity)...")
-                    do {
-                        try await refreshUserData()
-                        print("[EntityAuth][initializeAsync] Step 3: refreshUserData() SUCCESS")
-                    } catch {
-                        print("[EntityAuth][initializeAsync] Step 3 ERROR: refreshUserData() FAILED: \(error)")
-                        // Don't throw - snapshot may still be partially usable
-                    }
-                    
-                    // Step 4: Check if we need to create org (only if no orgs exist AND token has no oid)
+                    // Step 3: Check if we need to create org (only if no orgs exist AND token has no oid)
                     let tokenOid = currentActiveOrgIdFromAccessToken()
                     let hasExistingOrgs = !(snapshot.organizations.isEmpty)
                     if !hasExistingOrgs && tokenOid == nil {
-                        print("[EntityAuth][initializeAsync] Step 4: No orgs found and token has no oid - creating organization...")
+                        print("[EntityAuth][initializeAsync] Step 3: No orgs found and token has no oid - creating organization...")
                         do {
                             let identity = (email: snapshot.email, username: snapshot.username)
                             try await ensureOrganizationAndActivateIfMissing(usingIdentity: identity)
-                        print("[EntityAuth][initializeAsync] Step 4: ensureOrganizationAndActivateIfMissing() completed")
-                            print("[EntityAuth][initializeAsync] Step 5: Refreshing user data after org creation...")
-                            try await refreshUserData()
-                            print("[EntityAuth][initializeAsync] Step 5: refreshUserData() SUCCESS")
-                    } catch {
-                        print("[EntityAuth][initializeAsync] Step 4 ERROR: ensureOrganizationAndActivateIfMissing() FAILED: \(error)")
-                            // Continue - org might already exist or will be created later
+                            print("[EntityAuth][initializeAsync] Step 3: ensureOrganizationAndActivateIfMissing() completed")
+                            // Refresh after org creation (will use bootstrap)
+                            try await refreshUserData(userId: snapshot.userId)
+                            print("[EntityAuth][initializeAsync] Step 3: refreshUserData() after org creation SUCCESS")
+                        } catch {
+                            print("[EntityAuth][initializeAsync] Step 3 ERROR: ensureOrganizationAndActivateIfMissing() FAILED: \(error)")
                         }
                     } else {
-                        print("[EntityAuth][initializeAsync] Step 4: Skipping org creation (hasOrgs=\(hasExistingOrgs) tokenOid=\(tokenOid ?? "nil"))")
+                        print("[EntityAuth][initializeAsync] Step 3: Skipping org creation (hasOrgs=\(hasExistingOrgs) tokenOid=\(tokenOid ?? "nil"))")
                     }
                     
-                    // Step 6: If still no active org but memberships exist, switch to first org
-                    print("[EntityAuth][initializeAsync] Step 6: Checking if need to switch to first org...")
+                    // Step 4: If still no active org but memberships exist, switch to first org
+                    print("[EntityAuth][initializeAsync] Step 4: Checking if need to switch to first org...")
                     let tokenOidBeforeSwitch = currentActiveOrgIdFromAccessToken()
                     if tokenOidBeforeSwitch == nil, let firstOrg = snapshot.organizations.first?.orgId {
-                        print("[EntityAuth][initializeAsync] Step 6: Token has no oid, switching to first org: \(firstOrg)")
+                        print("[EntityAuth][initializeAsync] Step 4: Token has no oid, switching to first org: \(firstOrg)")
                         do {
                             let newToken = try await dependencies.organizationService.switchOrg(orgId: firstOrg)
                             try dependencies.authState.update(accessToken: newToken)
                             snapshot.accessToken = newToken
-                            print("[EntityAuth][initializeAsync] Step 6: Switched to org \(firstOrg), refreshing user data...")
-                            // Refresh again after switch to update activeOrganization
-                        try await refreshUserData()
-                            print("[EntityAuth][initializeAsync] Step 6: refreshUserData() after switch SUCCESS")
-                    } catch {
-                            print("[EntityAuth][initializeAsync] Step 6 ERROR: switchOrg/refreshUserData FAILED: \(error)")
-                            // Continue - might still work with existing token
-                        }
-                    }
-                    
-                    // Step 7: Backfill email from token if /me returned none
-                    if (snapshot.email == nil || snapshot.email?.isEmpty == true), let claimEmail = currentEmailFromAccessToken() {
-                        print("[EntityAuth][initializeAsync] Step 7: Backfilling email from token: \(claimEmail)")
-                        do {
-                            try await setEmail(claimEmail)
+                            print("[EntityAuth][initializeAsync] Step 4: Switched to org \(firstOrg), refreshing user data...")
+                            // Refresh after switch (will use bootstrap)
+                            try await refreshUserData(userId: snapshot.userId)
+                            print("[EntityAuth][initializeAsync] Step 4: refreshUserData() after switch SUCCESS")
                         } catch {
-                            print("[EntityAuth][initializeAsync] Step 7 ERROR: setEmail() FAILED: \(error)")
+                            print("[EntityAuth][initializeAsync] Step 4 ERROR: switchOrg/refreshUserData FAILED: \(error)")
                         }
                     }
                     
                     print("[EntityAuth][initializeAsync] Final state - userId=\(snapshot.userId ?? "nil") activeOrg=\(snapshot.activeOrganization?.orgId ?? "nil") orgs.count=\(snapshot.organizations.count)")
                     print("[EntityAuth][initializeAsync] Emitting final snapshot...")
                     emit()
+                    
+                    // Invoke onAuthenticated callback if user is authenticated
+                    if let userId = snapshot.userId, let activeOrg = snapshot.activeOrganization?.orgId {
+                        print("[EntityAuth][initializeAsync] Invoking onAuthenticated callback")
+                        onAuthenticatedCallback?(snapshot)
+                    }
                 }
             } catch {
                 print("[EntityAuth][initializeAsync] FATAL ERROR in coalesced block: \(error)")

@@ -19,6 +19,8 @@ public protocol OrganizationsProviding: Sendable {
     func switchOrg(orgId: String) async throws -> String
     func switchActive(workspaceTenantId: String, orgId: String) async throws -> String
     func list() async throws -> [OrganizationSummaryDTO]
+    func list(userId: String?) async throws -> [OrganizationSummaryDTO]
+    func bootstrap() async throws -> BootstrapResponse
     func active() async throws -> ActiveOrganizationDTO?
     // Updates for active organization (derived from access token org context)
     func setActiveOrgName(_ name: String) async throws
@@ -143,13 +145,25 @@ public final class OrganizationService: OrganizationsProviding {
     }
 
     public func list() async throws -> [OrganizationSummaryDTO] {
-        // Resolve current user id via /api/user/me
-        let meReq = APIRequest(method: .get, path: "/api/user/me")
-        let me = try await client.send(meReq, decode: UserResponse.self)
+        return try await list(userId: nil)
+    }
+    
+    public func list(userId: String?) async throws -> [OrganizationSummaryDTO] {
+        // If userId provided, skip /api/user/me call
+        let resolvedUserId: String
+        if let userId = userId {
+            resolvedUserId = userId
+        } else {
+            // Resolve current user id via /api/user/me
+            let meReq = APIRequest(method: .get, path: "/api/user/me")
+            let me = try await client.send(meReq, decode: UserResponse.self)
+            resolvedUserId = me.id
+        }
+        
         // Query memberships via generic relations
         var orgs: [OrganizationSummaryDTO] = []
         let params = [
-            URLQueryItem(name: "srcId", value: me.id),
+            URLQueryItem(name: "srcId", value: resolvedUserId),
             URLQueryItem(name: "relation", value: "member_of")
         ]
         let relReq = APIRequest(method: .get, path: "/api/relations", queryItems: params)
@@ -178,6 +192,11 @@ public final class OrganizationService: OrganizationsProviding {
             }
         }
         return orgs
+    }
+    
+    public func bootstrap() async throws -> BootstrapResponse {
+        let req = APIRequest(method: .get, path: "/api/user/bootstrap")
+        return try await client.send(req, decode: BootstrapResponse.self)
     }
 
     public func active() async throws -> ActiveOrganizationDTO? {

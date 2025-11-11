@@ -204,6 +204,29 @@ public struct UserResponse: Decodable, Sendable {
     public let workspaceTenantId: String?
 }
 
+public struct BootstrapResponse: Decodable, Sendable {
+    public struct User: Decodable, Sendable {
+        public let id: String
+        public let email: String?
+        public let username: String?
+        public let imageUrl: String?
+        public let workspaceTenantId: String?
+    }
+    public struct Organization: Decodable, Sendable {
+        public let orgId: String
+        public let name: String?
+        public let slug: String?
+        public let memberCount: Int?
+        public let role: String
+        public let joinedAt: Double
+        public let workspaceTenantId: String?
+        public let description: String?
+    }
+    public let user: User
+    public let organizations: [Organization]
+    public let activeOrganizationId: String?
+}
+
 public struct EntityDTO: Decodable, Sendable {
     public let id: String
     public let kind: String?
