@@ -652,31 +652,57 @@ public actor EntityAuthFacade {
     public func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO] {
         try await dependencies.organizationService.listWorkspaceMembers(workspaceTenantId: workspaceTenantId)
     }
-    // MARK: - Invitations
-    public func searchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? {
-        try await dependencies.invitationService.findUser(email: email, username: username)
-    }
+    // MARK: - Invitations (New System)
     public func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] {
-        try await dependencies.invitationService.findUsers(q: q)
+        try await dependencies.invitationService.searchUsers(q: q)
     }
-    public func listInvitationsReceived(for userId: String) async throws -> [Invitation] {
-        try await dependencies.invitationService.listReceived(for: userId)
+    
+    public func startInvitation(orgId: String, inviteeUserId: String, role: String) async throws -> (id: String, token: String, expiresAt: Double) {
+        let response = try await dependencies.invitationService.start(
+            orgId: orgId,
+            inviteeUserId: inviteeUserId,
+            role: role
+        )
+        return (response.id, response.token, response.expiresAt)
     }
-    public func listInvitationsSent(by inviterId: String) async throws -> [Invitation] {
-        try await dependencies.invitationService.listSent(by: inviterId)
-    }
-    public func sendInvitation(orgId: String, inviteeId: String, role: String) async throws {
-        try await dependencies.invitationService.send(orgId: orgId, inviteeId: inviteeId, role: role)
-    }
-    public func acceptInvitation(invitationId: String) async throws {
-        try await dependencies.invitationService.accept(invitationId: invitationId)
+    
+    public func acceptInvitation(token: String) async throws {
+        try await dependencies.invitationService.accept(token: token)
         try? await refreshUserData()
     }
+    
+    public func acceptInvitationById(invitationId: String) async throws {
+        try await dependencies.invitationService.acceptById(invitationId: invitationId)
+        try? await refreshUserData()
+    }
+    
     public func declineInvitation(invitationId: String) async throws {
         try await dependencies.invitationService.decline(invitationId: invitationId)
     }
+    
     public func revokeInvitation(invitationId: String) async throws {
         try await dependencies.invitationService.revoke(invitationId: invitationId)
+    }
+    
+    public func resendInvitation(invitationId: String) async throws -> (token: String, expiresAt: Double) {
+        let response = try await dependencies.invitationService.resend(invitationId: invitationId)
+        return (response.token, response.expiresAt)
+    }
+    
+    public func listInvitationsSent(cursor: String?, limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?) {
+        guard let userId = snapshot.userId else {
+            throw EntityAuthError.unauthorized
+        }
+        let response = try await dependencies.invitationService.listSent(inviterId: userId, cursor: cursor, limit: limit)
+        return (response.items, response.hasMore, response.nextCursor)
+    }
+    
+    public func listInvitationsReceived(cursor: String?, limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?) {
+        guard let userId = snapshot.userId else {
+            throw EntityAuthError.unauthorized
+        }
+        let response = try await dependencies.invitationService.listReceived(userId: userId, cursor: cursor, limit: limit)
+        return (response.items, response.hasMore, response.nextCursor)
     }
 
     public func addMember(orgId: String, userId: String, role: String) async throws {

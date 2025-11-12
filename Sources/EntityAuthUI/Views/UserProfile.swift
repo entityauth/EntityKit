@@ -1099,27 +1099,34 @@ private struct DeleteAccountContent: View {
     }
 }
 
-// MARK: - Invitations Content (Shared)
+// MARK: - Invitations Content (New System)
 private struct InvitationsContent: View {
     @Environment(\.entityAuthProvider) private var ea
     @Environment(\.colorScheme) private var colorScheme
     @State private var isLoading = false
     @State private var received: [Invitation] = []
     @State private var sent: [Invitation] = []
+    @State private var receivedCursor: String?
+    @State private var sentCursor: String?
+    @State private var receivedHasMore = false
+    @State private var sentHasMore = false
     @State private var error: String?
     @State private var searchText: String = ""
     @State private var foundUsers: [(id: String, email: String?, username: String?)] = []
     @State private var searchTask: Task<Void, Never>?
     @State private var orgsICanInvite: [OrganizationSummary] = []
     @State private var orgNameForId: [String: String] = [:]
+    @State private var invitationTokens: [String: String] = [:] // Map invitation ID to token for accept
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            inviteSearchSection
-            listsSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                inviteSearchSection
+                listsSection
+            }
+            .padding()
         }
         .onAppear { Task { await loadAll() } }
-        // Event-driven refresh via realtime snapshot stream
         .task {
             let stream = await ea.snapshotStream()
             for await _ in stream {
@@ -1133,7 +1140,7 @@ private struct InvitationsContent: View {
             Text("Invite a user")
                 .font(.system(.headline, design: .rounded, weight: .semibold))
 
-            TextField("", text: $searchText, prompt: Text("Search by email or username"))
+            TextField("", text: $searchText, prompt: Text("Search users (fuzzy)"))
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: searchText) { _, newValue in
                     searchTask?.cancel()
@@ -1142,6 +1149,7 @@ private struct InvitationsContent: View {
                         foundUsers = []
                         return
                     }
+                    guard q.count >= 2 else { return }
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
                         if Task.isCancelled { return }
@@ -1166,7 +1174,7 @@ private struct InvitationsContent: View {
                             Menu("Invite to...") {
                                 ForEach(orgsICanInvite, id: \.orgId) { org in
                                     Button("\(org.name ?? org.slug ?? org.orgId) (\(org.role))") {
-                                        Task { await sendInvite(orgId: org.orgId, inviteeId: user.id) }
+                                        Task { await sendInvite(orgId: org.orgId, inviteeUserId: user.id) }
                                     }
                                 }
                             }
@@ -1197,22 +1205,46 @@ private struct InvitationsContent: View {
             } else {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Received").font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        HStack(spacing: 8) {
+                            Text("Received").font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            Text("\(received.count)")
+                                .font(.system(.caption, design: .rounded, weight: .semibold))
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                        }
                         if received.isEmpty {
                             roundedInfo("No invitations")
                         } else {
                             ForEach(received, id: \.id) { inv in
                                 invitationRow(inv, actions: .received)
                             }
+                            if receivedHasMore {
+                                Button("Load more...") {
+                                    Task { await loadMoreReceived() }
+                                }
+                                .font(.caption)
+                            }
                         }
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Sent").font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        HStack(spacing: 8) {
+                            Text("Sent").font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            Text("\(sent.count)")
+                                .font(.system(.caption, design: .rounded, weight: .semibold))
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                        }
                         if sent.isEmpty {
                             roundedInfo("No invitations sent")
                         } else {
                             ForEach(sent, id: \.id) { inv in
                                 invitationRow(inv, actions: .sent)
+                            }
+                            if sentHasMore {
+                                Button("Load more...") {
+                                    Task { await loadMoreSent() }
+                                }
+                                .font(.caption)
                             }
                         }
                     }
@@ -1226,23 +1258,42 @@ private struct InvitationsContent: View {
     @ViewBuilder
     private func invitationRow(_ inv: Invitation, actions: InvitationActions) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Org: \(orgNameForId[inv.orgId] ?? inv.orgId)")
                     .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                Text("Role: \(inv.role) • State: \(inv.state)")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text(inv.role.capitalized)
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                    Text(inv.status.capitalized)
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(statusColor(inv.status)))
+                        .foregroundStyle(statusTextColor(inv.status))
+                }
+                let expiresDate = Date(timeIntervalSince1970: inv.expiresAt / 1000)
+                if expiresDate < Date() {
+                    Text("Expired")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.red)
+                }
             }
             Spacer()
             switch actions {
             case .received:
-                HStack(spacing: 8) {
-                    Button("Accept") { Task { await accept(inv.id) } }
-                    Button("Decline") { Task { await decline(inv.id) } }.buttonStyle(.bordered)
+                if inv.status == "pending" {
+                    HStack(spacing: 8) {
+                        Button("Accept") { Task { await accept(inv.id) } }
+                        Button("Decline") { Task { await decline(inv.id) } }.buttonStyle(.bordered)
+                    }
                 }
             case .sent:
-                if inv.state == "pending" {
-                    Button("Revoke") { Task { await revoke(inv.id) } }.buttonStyle(.bordered)
+                if inv.status == "pending" {
+                    HStack(spacing: 8) {
+                        Button("Revoke") { Task { await revoke(inv.id) } }.buttonStyle(.bordered)
+                        Button("Resend") { Task { await resend(inv.id) } }.buttonStyle(.bordered)
+                    }
                 }
             }
         }
@@ -1268,11 +1319,19 @@ private struct InvitationsContent: View {
     private func loadAll() async {
         isLoading = true
         defer { isLoading = false }
+        error = nil
         do {
-            let snap = await ea.currentSnapshot()
-            guard let userId = snap.userId else { return }
-            received = try await ea.invitationsReceived(userId: userId)
-            sent = try await ea.invitationsSent(inviterId: userId)
+            let (receivedResult, sentResult) = try await (
+                ea.invitationsReceived(cursor: nil, limit: 20),
+                ea.invitationsSent(cursor: nil, limit: 20)
+            )
+            received = receivedResult.items
+            receivedHasMore = receivedResult.hasMore
+            receivedCursor = receivedResult.nextCursor
+            sent = sentResult.items
+            sentHasMore = sentResult.hasMore
+            sentCursor = sentResult.nextCursor
+            
             let orgs = try await ea.organizations()
             orgsICanInvite = orgs.filter { $0.role == "owner" || $0.role == "admin" }
             orgNameForId = Dictionary(uniqueKeysWithValues: orgs.map { org in
@@ -1282,11 +1341,35 @@ private struct InvitationsContent: View {
             self.error = error.localizedDescription
         }
     }
+    
+    private func loadMoreReceived() async {
+        guard let cursor = receivedCursor else { return }
+        do {
+            let result = try await ea.invitationsReceived(cursor: cursor, limit: 20)
+            received.append(contentsOf: result.items)
+            receivedHasMore = result.hasMore
+            receivedCursor = result.nextCursor
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+    
+    private func loadMoreSent() async {
+        guard let cursor = sentCursor else { return }
+        do {
+            let result = try await ea.invitationsSent(cursor: cursor, limit: 20)
+            sent.append(contentsOf: result.items)
+            sentHasMore = result.hasMore
+            sentCursor = result.nextCursor
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 
     private func search() async {
         error = nil
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return }
+        guard !q.isEmpty, q.count >= 2 else { return }
         do {
             let users = try await ea.inviteSearchUsers(q: q)
             foundUsers = users
@@ -1295,40 +1378,82 @@ private struct InvitationsContent: View {
         }
     }
 
-    private func sendInvite(orgId: String, inviteeId: String) async {
+    private func sendInvite(orgId: String, inviteeUserId: String) async {
+        error = nil
         do {
-            try await ea.inviteSend(orgId: orgId, inviteeId: inviteeId, role: "member")
-            try await loadAll()
+            let result = try await ea.inviteStart(orgId: orgId, inviteeUserId: inviteeUserId, role: "member")
+            // Store token for this invitation (though we may not need it unless accepting)
+            invitationTokens[result.id] = result.token
+            await loadAll()
+            searchText = "" // Clear search
+            foundUsers = []
         } catch {
             self.error = error.localizedDescription
         }
     }
 
     private func accept(_ id: String) async {
+        error = nil
         do {
-            try await ea.inviteAccept(invitationId: id)
-            try await loadAll()
+            try await ea.inviteAcceptById(invitationId: id)
+            await loadAll()
         } catch {
             self.error = error.localizedDescription
         }
     }
 
     private func decline(_ id: String) async {
+        error = nil
         do {
             try await ea.inviteDecline(invitationId: id)
-            try await loadAll()
+            await loadAll()
         } catch {
             self.error = error.localizedDescription
         }
     }
 
     private func revoke(_ id: String) async {
+        error = nil
         do {
             try await ea.inviteRevoke(invitationId: id)
-            try await loadAll()
+            await loadAll()
         } catch {
             self.error = error.localizedDescription
         }
+    }
+    
+    private func resend(_ id: String) async {
+        error = nil
+        do {
+            let result = try await ea.inviteResend(invitationId: id)
+            invitationTokens[id] = result.token
+            await loadAll()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Styling Helpers
+private func statusColor(_ status: String) -> Color {
+    switch status.lowercased() {
+    case "pending": return Color.yellow.opacity(0.2)
+    case "accepted": return Color.green.opacity(0.2)
+    case "declined": return Color.orange.opacity(0.2)
+    case "revoked": return Color.gray.opacity(0.2)
+    case "expired": return Color.red.opacity(0.2)
+    default: return Color.secondary.opacity(0.15)
+    }
+}
+
+private func statusTextColor(_ status: String) -> Color {
+    switch status.lowercased() {
+    case "pending": return .yellow
+    case "accepted": return .green
+    case "declined": return .orange
+    case "revoked": return .gray
+    case "expired": return .red
+    default: return .secondary
     }
 }
 

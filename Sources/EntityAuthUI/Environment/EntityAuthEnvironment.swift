@@ -34,15 +34,16 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _listMembers: @Sendable (_ orgId: String) async throws -> [OrgMemberDTO]
     private let _removeMember: @Sendable (_ orgId: String, _ userId: String) async throws -> Void
     private let _listWorkspaceMembers: @Sendable (_ workspaceTenantId: String) async throws -> [WorkspaceMemberDTO]
-    // Invitations
-    private let _inviteSearchUser: @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?
+    // Invitations (New System)
     private let _inviteSearchUsers: @Sendable (_ q: String) async throws -> [(id: String, email: String?, username: String?)]
-    private let _invitationsReceived: @Sendable (_ userId: String) async throws -> [Invitation]
-    private let _invitationsSent: @Sendable (_ inviterId: String) async throws -> [Invitation]
-    private let _inviteSend: @Sendable (_ orgId: String, _ inviteeId: String, _ role: String) async throws -> Void
-    private let _inviteAccept: @Sendable (_ invitationId: String) async throws -> Void
+    private let _inviteStart: @Sendable (_ orgId: String, _ inviteeUserId: String, _ role: String) async throws -> (id: String, token: String, expiresAt: Double)
+    private let _inviteAccept: @Sendable (_ token: String) async throws -> Void
+    private let _inviteAcceptById: @Sendable (_ invitationId: String) async throws -> Void
     private let _inviteDecline: @Sendable (_ invitationId: String) async throws -> Void
     private let _inviteRevoke: @Sendable (_ invitationId: String) async throws -> Void
+    private let _inviteResend: @Sendable (_ invitationId: String) async throws -> (token: String, expiresAt: Double)
+    private let _invitationsReceived: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?)
+    private let _invitationsSent: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?)
 
     public init(
         stream: @escaping @Sendable () async -> AsyncStream<Snapshot>,
@@ -71,14 +72,15 @@ public struct AnyEntityAuthProvider: Sendable {
         listMembers: @escaping @Sendable (_ orgId: String) async throws -> [OrgMemberDTO],
         removeMember: @escaping @Sendable (_ orgId: String, _ userId: String) async throws -> Void,
         listWorkspaceMembers: @escaping @Sendable (_ workspaceTenantId: String) async throws -> [WorkspaceMemberDTO],
-        inviteSearchUser: @escaping @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?,
         inviteSearchUsers: @escaping @Sendable (_ q: String) async throws -> [(id: String, email: String?, username: String?)],
-        invitationsReceived: @escaping @Sendable (_ userId: String) async throws -> [Invitation],
-        invitationsSent: @escaping @Sendable (_ inviterId: String) async throws -> [Invitation],
-        inviteSend: @escaping @Sendable (_ orgId: String, _ inviteeId: String, _ role: String) async throws -> Void,
-        inviteAccept: @escaping @Sendable (_ invitationId: String) async throws -> Void,
+        inviteStart: @escaping @Sendable (_ orgId: String, _ inviteeUserId: String, _ role: String) async throws -> (id: String, token: String, expiresAt: Double),
+        inviteAccept: @escaping @Sendable (_ token: String) async throws -> Void,
+        inviteAcceptById: @escaping @Sendable (_ invitationId: String) async throws -> Void,
         inviteDecline: @escaping @Sendable (_ invitationId: String) async throws -> Void,
-        inviteRevoke: @escaping @Sendable (_ invitationId: String) async throws -> Void
+        inviteRevoke: @escaping @Sendable (_ invitationId: String) async throws -> Void,
+        inviteResend: @escaping @Sendable (_ invitationId: String) async throws -> (token: String, expiresAt: Double),
+        invitationsReceived: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?),
+        invitationsSent: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?)
     ) {
         self._stream = stream
         self._current = current
@@ -106,14 +108,15 @@ public struct AnyEntityAuthProvider: Sendable {
         self._listMembers = listMembers
         self._removeMember = removeMember
         self._listWorkspaceMembers = listWorkspaceMembers
-        self._inviteSearchUser = inviteSearchUser
         self._inviteSearchUsers = inviteSearchUsers
-        self._invitationsReceived = invitationsReceived
-        self._invitationsSent = invitationsSent
-        self._inviteSend = inviteSend
+        self._inviteStart = inviteStart
         self._inviteAccept = inviteAccept
+        self._inviteAcceptById = inviteAcceptById
         self._inviteDecline = inviteDecline
         self._inviteRevoke = inviteRevoke
+        self._inviteResend = inviteResend
+        self._invitationsReceived = invitationsReceived
+        self._invitationsSent = invitationsSent
     }
 
     public func snapshotStream() async -> AsyncStream<Snapshot> { await _stream() }
@@ -142,14 +145,15 @@ public struct AnyEntityAuthProvider: Sendable {
     public func listMembers(orgId: String) async throws -> [OrgMemberDTO] { try await _listMembers(orgId) }
     public func removeMember(orgId: String, userId: String) async throws { try await _removeMember(orgId, userId) }
     public func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO] { try await _listWorkspaceMembers(workspaceTenantId) }
-    public func inviteSearchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? { try await _inviteSearchUser(email, username) }
     public func inviteSearchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] { try await _inviteSearchUsers(q) }
-    public func invitationsReceived(userId: String) async throws -> [Invitation] { try await _invitationsReceived(userId) }
-    public func invitationsSent(inviterId: String) async throws -> [Invitation] { try await _invitationsSent(inviterId) }
-    public func inviteSend(orgId: String, inviteeId: String, role: String) async throws { try await _inviteSend(orgId, inviteeId, role) }
-    public func inviteAccept(invitationId: String) async throws { try await _inviteAccept(invitationId) }
+    public func inviteStart(orgId: String, inviteeUserId: String, role: String) async throws -> (id: String, token: String, expiresAt: Double) { try await _inviteStart(orgId, inviteeUserId, role) }
+    public func inviteAccept(token: String) async throws { try await _inviteAccept(token) }
+    public func inviteAcceptById(invitationId: String) async throws { try await _inviteAcceptById(invitationId) }
     public func inviteDecline(invitationId: String) async throws { try await _inviteDecline(invitationId) }
     public func inviteRevoke(invitationId: String) async throws { try await _inviteRevoke(invitationId) }
+    public func inviteResend(invitationId: String) async throws -> (token: String, expiresAt: Double) { try await _inviteResend(invitationId) }
+    public func invitationsReceived(cursor: String?, limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?) { try await _invitationsReceived(cursor, limit) }
+    public func invitationsSent(cursor: String?, limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?) { try await _invitationsSent(cursor, limit) }
 }
 
 public extension AnyEntityAuthProvider {
@@ -201,14 +205,15 @@ public extension AnyEntityAuthProvider {
             listMembers: { orgId in try await facade.listOrganizationMembers(orgId: orgId) },
             removeMember: { orgId, userId in try await facade.removeOrganizationMember(orgId: orgId, userId: userId) },
             listWorkspaceMembers: { workspaceTenantId in try await facade.listWorkspaceMembers(workspaceTenantId: workspaceTenantId) },
-            inviteSearchUser: { email, username in try await facade.searchUser(email: email, username: username) },
             inviteSearchUsers: { q in try await facade.searchUsers(q: q) },
-            invitationsReceived: { userId in try await facade.listInvitationsReceived(for: userId) },
-            invitationsSent: { inviterId in try await facade.listInvitationsSent(by: inviterId) },
-            inviteSend: { orgId, inviteeId, role in try await facade.sendInvitation(orgId: orgId, inviteeId: inviteeId, role: role) },
-            inviteAccept: { invitationId in try await facade.acceptInvitation(invitationId: invitationId) },
+            inviteStart: { orgId, inviteeUserId, role in try await facade.startInvitation(orgId: orgId, inviteeUserId: inviteeUserId, role: role) },
+            inviteAccept: { token in try await facade.acceptInvitation(token: token) },
+            inviteAcceptById: { invitationId in try await facade.acceptInvitationById(invitationId: invitationId) },
             inviteDecline: { invitationId in try await facade.declineInvitation(invitationId: invitationId) },
-            inviteRevoke: { invitationId in try await facade.revokeInvitation(invitationId: invitationId) }
+            inviteRevoke: { invitationId in try await facade.revokeInvitation(invitationId: invitationId) },
+            inviteResend: { invitationId in try await facade.resendInvitation(invitationId: invitationId) },
+            invitationsReceived: { cursor, limit in try await facade.listInvitationsReceived(cursor: cursor, limit: limit) },
+            invitationsSent: { cursor, limit in try await facade.listInvitationsSent(cursor: cursor, limit: limit) }
         )
     }
 
@@ -272,14 +277,15 @@ public extension AnyEntityAuthProvider {
             listMembers: { _ in [] },
             removeMember: { _, _ in },
             listWorkspaceMembers: { _ in [] },
-            inviteSearchUser: { _, _ in nil },
             inviteSearchUsers: { _ in [] },
-            invitationsReceived: { _ in [] },
-            invitationsSent: { _ in [] },
-            inviteSend: { _, _, _ in },
+            inviteStart: { _, _, _ in throw NSError(domain: "preview", code: -1) },
             inviteAccept: { _ in },
+            inviteAcceptById: { _ in },
             inviteDecline: { _ in },
-            inviteRevoke: { _ in }
+            inviteRevoke: { _ in },
+            inviteResend: { _ in throw NSError(domain: "preview", code: -1) },
+            invitationsReceived: { _, _ in ([], false, nil) },
+            invitationsSent: { _, _ in ([], false, nil) }
         )
     }
 
@@ -354,14 +360,15 @@ public extension AnyEntityAuthProvider {
             listMembers: { _ in [] },
             removeMember: { _, _ in },
             listWorkspaceMembers: { _ in [] },
-            inviteSearchUser: { _, _ in nil },
             inviteSearchUsers: { _ in [] },
-            invitationsReceived: { _ in [] },
-            invitationsSent: { _ in [] },
-            inviteSend: { _, _, _ in },
+            inviteStart: { _, _, _ in throw NSError(domain: "preview", code: -1) },
             inviteAccept: { _ in },
+            inviteAcceptById: { _ in },
             inviteDecline: { _ in },
-            inviteRevoke: { _ in }
+            inviteRevoke: { _ in },
+            inviteResend: { _ in throw NSError(domain: "preview", code: -1) },
+            invitationsReceived: { _, _ in ([], false, nil) },
+            invitationsSent: { _, _ in ([], false, nil) }
         )
     }
 }

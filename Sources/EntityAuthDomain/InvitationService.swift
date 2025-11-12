@@ -1,24 +1,83 @@
 import Foundation
 
+// Standardized invitation error codes matching backend
+public enum InvitationError: Error, Sendable {
+    case notFound
+    case expired
+    case alreadyAccepted
+    case alreadyDeclined
+    case alreadyRevoked
+    case duplicate
+    case alreadyMember
+    case unauthorized
+    case invalidToken
+    case rateLimited
+    case networkError(String)
+    case unknown(String)
+    
+    init?(from errorCode: String) {
+        switch errorCode {
+        case "INVITATION_NOT_FOUND": self = .notFound
+        case "INVITATION_EXPIRED": self = .expired
+        case "INVITATION_ALREADY_ACCEPTED": self = .alreadyAccepted
+        case "INVITATION_ALREADY_DECLINED": self = .alreadyDeclined
+        case "INVITATION_ALREADY_REVOKED": self = .alreadyRevoked
+        case "INVITATION_DUPLICATE": self = .duplicate
+        case "USER_ALREADY_MEMBER": self = .alreadyMember
+        case "UNAUTHORIZED": self = .unauthorized
+        case "INVALID_TOKEN": self = .invalidToken
+        case "RATE_LIMITED": self = .rateLimited
+        default: return nil
+        }
+    }
+}
+
 public struct Invitation: Codable, Sendable, Identifiable, Hashable {
     public let id: String
     public let orgId: String
-    public let inviteeId: String
-    public let inviterId: String
+    public let inviteeUserId: String
     public let role: String
-    public let state: String
+    public let status: String
+    public let expiresAt: Double
+    public let createdAt: Double
     public let respondedAt: Double?
+    public let createdBy: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case orgId
+        case inviteeUserId
+        case role
+        case status
+        case expiresAt
+        case createdAt
+        case respondedAt
+        case createdBy
+    }
+}
+
+public struct InvitationListResponse: Codable, Sendable {
+    public let items: [Invitation]
+    public let hasMore: Bool
+    public let nextCursor: String?
+}
+
+public struct InvitationStartResponse: Codable, Sendable {
+    public let id: String
+    public let token: String // Only returned on creation
+    public let expiresAt: Double
 }
 
 public protocol InvitationsProviding: Sendable {
-    func listReceived(for userId: String) async throws -> [Invitation]
-    func listSent(by inviterId: String) async throws -> [Invitation]
-    func send(orgId: String, inviteeId: String, role: String) async throws
-    func accept(invitationId: String) async throws
+    func start(orgId: String, inviteeUserId: String, role: String) async throws -> InvitationStartResponse
+    func accept(token: String) async throws
+    func acceptById(invitationId: String) async throws
     func decline(invitationId: String) async throws
     func revoke(invitationId: String) async throws
-    func findUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)?
-    func findUsers(q: String) async throws -> [(id: String, email: String?, username: String?)]
+    func resend(invitationId: String) async throws -> InvitationStartResponse
+    func listSent(inviterId: String, cursor: String?, limit: Int) async throws -> InvitationListResponse
+    func listReceived(userId: String, cursor: String?, limit: Int) async throws -> InvitationListResponse
+    func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)]
 }
 
 public final class InvitationService: InvitationsProviding {
@@ -27,132 +86,139 @@ public final class InvitationService: InvitationsProviding {
     public init(client: APIClientType) {
         self.client = client
     }
-
-    public func findUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? {
-        var payload: [String: Any] = [:]
-        if let e = email, !e.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            payload["email"] = e
-        }
-        if let u = username, !u.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            payload["username"] = u
-        }
-        let data = try JSONSerialization.data(withJSONObject: payload)
-        let req = APIRequest(method: .post, path: "/api/users/search", body: data)
-        struct Raw: Decodable { let _id: String?; let properties: Props?; struct Props: Decodable { let email: String?; let username: String? } }
-        let result = try await client.send(req, decode: Raw?.self)
-        guard let id = result?._id else { return nil }
-        return (id, result?.properties?.email, result?.properties?.username)
-    }
-  
-  public func findUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] {
-    let body: [String: Any] = ["q": q]
-    let data = try JSONSerialization.data(withJSONObject: body)
-    let req = APIRequest(method: .post, path: "/api/users/search", body: data)
-    struct Raw: Decodable { let _id: String?; let properties: Props?; struct Props: Decodable { let email: String?; let username: String? } }
-    let rows = try await client.send(req, decode: [Raw].self)
-    return rows.compactMap { r in
-      guard let id = r._id else { return nil }
-      return (id, r.properties?.email, r.properties?.username)
-    }
-  }
     
-    public func listReceived(for userId: String) async throws -> [Invitation] {
-        let req = APIRequest(
-            method: .get,
-            path: "/api/invitations",
-            queryItems: [.init(name: "userId", value: userId)]
-        )
-        struct Raw: Decodable {
-            let _id: String
-            let properties: Properties
-            struct Properties: Decodable {
-                let orgId: String
-                let inviteeId: String
-                let inviterId: String
-                let role: String?
-                let state: String?
-                let respondedAt: Double?
+    private func handleError(_ data: Data) throws {
+        // Try to parse error code from response
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let errorCode = json["error"] as? String {
+            if let invitationError = InvitationError(from: errorCode) {
+                throw invitationError
             }
-        }
-        let rows = try await client.send(req, decode: [Raw].self)
-        return rows.map {
-            Invitation(
-                id: $0._id,
-                orgId: $0.properties.orgId,
-                inviteeId: $0.properties.inviteeId,
-                inviterId: $0.properties.inviterId,
-                role: $0.properties.role ?? "member",
-                state: $0.properties.state ?? "pending",
-                respondedAt: $0.properties.respondedAt
-            )
+            throw InvitationError.unknown(errorCode)
         }
     }
     
-    public func listSent(by inviterId: String) async throws -> [Invitation] {
-        let req = APIRequest(
-            method: .get,
-            path: "/api/invitations",
-            queryItems: [.init(name: "inviterId", value: inviterId)]
-        )
-        struct Raw: Decodable {
-            let _id: String
-            let properties: Properties
-            struct Properties: Decodable {
-                let orgId: String
-                let inviteeId: String
-                let inviterId: String
-                let role: String?
-                let state: String?
-                let respondedAt: Double?
-            }
-        }
-        let rows = try await client.send(req, decode: [Raw].self)
-        return rows.map {
-            Invitation(
-                id: $0._id,
-                orgId: $0.properties.orgId,
-                inviteeId: $0.properties.inviteeId,
-                inviterId: $0.properties.inviterId,
-                role: $0.properties.role ?? "member",
-                state: $0.properties.state ?? "pending",
-                respondedAt: $0.properties.respondedAt
-            )
-        }
-    }
-    
-    public func send(orgId: String, inviteeId: String, role: String) async throws {
+    public func start(orgId: String, inviteeUserId: String, role: String) async throws -> InvitationStartResponse {
         let body: [String: Any] = [
-            "op": "send",
+            "op": "start",
             "orgId": orgId,
-            "inviteeId": inviteeId,
+            "inviteeUserId": inviteeUserId,
             "role": role
+        ]
+        
+        let data = try JSONSerialization.data(withJSONObject: body)
+        let req = APIRequest(method: .post, path: "/api/invitations", body: data)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
+        return try JSONDecoder().decode(InvitationStartResponse.self, from: responseData)
+    }
+    
+    public func accept(token: String) async throws {
+        let body: [String: Any] = [
+            "op": "accept",
+            "token": token
         ]
         let data = try JSONSerialization.data(withJSONObject: body)
         let req = APIRequest(method: .post, path: "/api/invitations", body: data)
-        _ = try await client.send(req)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
     }
     
-    public func accept(invitationId: String) async throws {
-        try await post(op: "accept", invitationId: invitationId)
-    }
-    
-    public func decline(invitationId: String) async throws {
-        try await post(op: "decline", invitationId: invitationId)
-    }
-    
-    public func revoke(invitationId: String) async throws {
-        try await post(op: "revoke", invitationId: invitationId)
-    }
-    
-    private func post(op: String, invitationId: String) async throws {
+    public func acceptById(invitationId: String) async throws {
         let body: [String: Any] = [
-            "op": op,
+            "op": "accept",
             "invitationId": invitationId
         ]
         let data = try JSONSerialization.data(withJSONObject: body)
         let req = APIRequest(method: .post, path: "/api/invitations", body: data)
-        _ = try await client.send(req)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
+    }
+    
+    public func decline(invitationId: String) async throws {
+        let body: [String: Any] = [
+            "op": "decline",
+            "invitationId": invitationId
+        ]
+        let data = try JSONSerialization.data(withJSONObject: body)
+        let req = APIRequest(method: .post, path: "/api/invitations", body: data)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
+    }
+    
+    public func revoke(invitationId: String) async throws {
+        let body: [String: Any] = [
+            "op": "revoke",
+            "invitationId": invitationId
+        ]
+        let data = try JSONSerialization.data(withJSONObject: body)
+        let req = APIRequest(method: .post, path: "/api/invitations", body: data)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
+    }
+    
+    public func resend(invitationId: String) async throws -> InvitationStartResponse {
+        let body: [String: Any] = [
+            "op": "resend",
+            "invitationId": invitationId
+        ]
+        let data = try JSONSerialization.data(withJSONObject: body)
+        let req = APIRequest(method: .post, path: "/api/invitations", body: data)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
+        return try JSONDecoder().decode(InvitationStartResponse.self, from: responseData)
+    }
+    
+    public func listSent(inviterId: String, cursor: String?, limit: Int = 20) async throws -> InvitationListResponse {
+        var queryItems: [URLQueryItem] = [
+            .init(name: "inviterId", value: inviterId)
+        ]
+        if let cursor = cursor {
+            queryItems.append(.init(name: "cursor", value: cursor))
+        }
+        queryItems.append(.init(name: "limit", value: String(limit)))
+        
+        let req = APIRequest(method: .get, path: "/api/invitations", queryItems: queryItems)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
+        return try JSONDecoder().decode(InvitationListResponse.self, from: responseData)
+    }
+    
+    public func listReceived(userId: String, cursor: String?, limit: Int = 20) async throws -> InvitationListResponse {
+        var queryItems: [URLQueryItem] = [
+            .init(name: "userId", value: userId)
+        ]
+        if let cursor = cursor {
+            queryItems.append(.init(name: "cursor", value: cursor))
+        }
+        queryItems.append(.init(name: "limit", value: String(limit)))
+        
+        let req = APIRequest(method: .get, path: "/api/invitations", queryItems: queryItems)
+        let responseData = try await client.send(req)
+        try handleError(responseData)
+        return try JSONDecoder().decode(InvitationListResponse.self, from: responseData)
+    }
+    
+    public func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] {
+        guard q.count >= 2 else {
+            return []
+        }
+        
+        let body: [String: Any] = ["q": q]
+        let data = try JSONSerialization.data(withJSONObject: body)
+        let req = APIRequest(method: .post, path: "/api/users/search", body: data)
+        struct Raw: Decodable {
+            let _id: String?
+            let properties: Props?
+            struct Props: Decodable {
+                let email: String?
+                let username: String?
+            }
+        }
+        let rows = try await client.send(req, decode: [Raw].self)
+        return rows.compactMap { r in
+            guard let id = r._id else { return nil }
+            return (id, r.properties?.email, r.properties?.username)
+        }
     }
 }
-
-

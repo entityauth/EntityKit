@@ -34,6 +34,8 @@ public struct Message<Content: View>: View {
     @State private var resolvedAuthor: MessageAuthor?
     @State private var workspaceMembers: [WorkspaceMemberDTO] = []
     @State private var isLoadingMembers = false
+    @State private var isHovered: Bool = false
+    @State private var isRevealingTimestamp: Bool = false
     
     /// Create a composable message with custom content
     /// - Parameters:
@@ -86,6 +88,34 @@ public struct Message<Content: View>: View {
                 avatarStackedLayout
             }
         }
+        #if os(macOS)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        #endif
+        #if os(iOS)
+        .gesture(
+            DragGesture(minimumDistance: 5, coordinateSpace: .local)
+                .onChanged { value in
+                    // Reveal when swiping from right to left
+                    if value.translation.width < -20 {
+                        if isRevealingTimestamp == false {
+                            isRevealingTimestamp = true
+                        }
+                    } else if value.translation.width > -5 {
+                        if isRevealingTimestamp == true {
+                            isRevealingTimestamp = false
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    // Hide shortly after end to mimic iMessage behavior
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        isRevealingTimestamp = false
+                    }
+                }
+        )
+        #endif
         .contextMenu {
             if let actions = actions {
                 contextMenuContent(actions)
@@ -175,7 +205,7 @@ public struct Message<Content: View>: View {
                 avatarView
                 VStack(alignment: .leading, spacing: 4) {
                     messageBubble
-                    if showTimestamp, let timestamp = timestamp {
+                    if shouldRevealTimestamp, showTimestamp, let timestamp = timestamp {
                         timestampView(timestamp)
                     }
                 }
@@ -184,7 +214,7 @@ public struct Message<Content: View>: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     messageBubble
-                    if showTimestamp, let timestamp = timestamp {
+                    if shouldRevealTimestamp, showTimestamp, let timestamp = timestamp {
                         timestampView(timestamp)
                     }
                 }
@@ -204,7 +234,7 @@ public struct Message<Content: View>: View {
                             .foregroundStyle(.secondary)
                     }
                     messageBubble
-                    if showTimestamp, let timestamp = timestamp {
+                    if shouldRevealTimestamp, showTimestamp, let timestamp = timestamp {
                         timestampView(timestamp)
                     }
                 }
@@ -218,7 +248,7 @@ public struct Message<Content: View>: View {
                             .foregroundStyle(.secondary)
                     }
                     messageBubble
-                    if showTimestamp, let timestamp = timestamp {
+                    if shouldRevealTimestamp, showTimestamp, let timestamp = timestamp {
                         timestampView(timestamp)
                     }
                 }
@@ -238,12 +268,12 @@ public struct Message<Content: View>: View {
                             .foregroundStyle(.primary)
                     }
                     Spacer()
-                    if showTimestamp, let timestamp = timestamp {
+                    if shouldRevealTimestamp, showTimestamp, let timestamp = timestamp {
                         timestampView(timestamp)
                             .padding(.trailing, 4)
                     }
                 } else {
-                    if showTimestamp, let timestamp = timestamp {
+                    if shouldRevealTimestamp, showTimestamp, let timestamp = timestamp {
                         timestampView(timestamp)
                             .padding(.leading, 4)
                     }
@@ -300,22 +330,23 @@ public struct Message<Content: View>: View {
     }
     
     private func formatTimestamp(_ date: Date) -> String {
-        let calendar = Calendar.current
-        
-        if calendar.isDateInToday(date) {
-            let formatter = DateFormatter()
-            formatter.timeStyle = .short
-            return formatter.string(from: date)
-        } else if calendar.isDateInYesterday(date) {
-            let formatter = DateFormatter()
-            formatter.timeStyle = .short
-            return "Yesterday \(formatter.string(from: date))"
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .short
-            formatter.timeStyle = .short
-            return formatter.string(from: date)
-        }
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    // MARK: - Visibility Rules
+    
+    private var shouldRevealTimestamp: Bool {
+        #if os(macOS)
+        return isHovered
+        #elseif os(iOS)
+        return isRevealingTimestamp
+        #else
+        return true
+        #endif
     }
     
     // MARK: - Context Menu
