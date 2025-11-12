@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		B842447E2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */ = {isa = PBXBuildFile; fileRef = B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */; };
 		B842447F2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */ = {isa = PBXBuildFile; fileRef = B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */; };
+		B89A110C2EC449BA00137E2C /* DocsData in Resources */ = {isa = PBXBuildFile; fileRef = B89A110B2EC449BA00137E2C /* DocsData */; };
+		B89A110D2EC449BA00137E2C /* DocsData in Resources */ = {isa = PBXBuildFile; fileRef = B89A110B2EC449BA00137E2C /* DocsData */; };
 		B8C7ADC02EA5F7370079C5D9 /* EntityKit in Frameworks */ = {isa = PBXBuildFile; productRef = B8C7ADBF2EA5F7370079C5D9 /* EntityKit */; };
 		B8C7ADC32EA5F74B0079C5D9 /* EntityKit in Frameworks */ = {isa = PBXBuildFile; productRef = B8C7ADC22EA5F74B0079C5D9 /* EntityKit */; };
 		B8C7ADC62EA5FAEF0079C5D9 /* EntityAuthUI in Frameworks */ = {isa = PBXBuildFile; productRef = B8C7ADC52EA5FAEF0079C5D9 /* EntityAuthUI */; };
@@ -17,6 +19,7 @@
 
 /* Begin PBXFileReference section */
 		B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = EntityKitSandbox.icon; sourceTree = "<group>"; };
+		B89A110B2EC449BA00137E2C /* DocsData */ = {isa = PBXFileReference; explicitFileType = wrapper.folder; includeInIndex = 0; lastKnownFileType = folder; path = DocsData; sourceTree = "<group>"; };
 		B8C7AD9E2EA5F4C10079C5D9 /* EntityKitSandbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EntityKitSandbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B8C7ADB32EA5F7210079C5D9 /* EntityKitSandboxiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EntityKitSandboxiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -87,6 +90,7 @@
 				B8C7ADC42EA5FAEF0079C5D9 /* Frameworks */,
 				B8C7AD9F2EA5F4C10079C5D9 /* Products */,
 				B842447D2EB32C36006F07A8 /* EntityKitSandbox.icon */,
+				B89A110B2EC449BA00137E2C /* DocsData */,
 			);
 			sourceTree = "<group>";
 		};
@@ -204,6 +208,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B842447E2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */,
+				B89A110C2EC449BA00137E2C /* DocsData in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -212,6 +217,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B842447F2EB32C36006F07A8 /* EntityKitSandbox.icon in Resources */,
+				B89A110D2EC449BA00137E2C /* DocsData in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

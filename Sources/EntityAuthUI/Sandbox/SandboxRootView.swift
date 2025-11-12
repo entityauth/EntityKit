@@ -115,6 +115,8 @@ private struct Preview: View {
             MessageGallery()
         case .organizationSwitcher:
             OrganizationSwitcherView()
+        case .docsViewer:
+            DocsViewerView()
         }
     }
 }

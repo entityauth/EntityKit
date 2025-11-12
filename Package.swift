@@ -9,10 +9,12 @@ let package = Package(
     ],
     products: [
         .library(name: "EntityKit", targets: ["EntityKit"]),
-        .library(name: "EntityAuthUI", targets: ["EntityAuthUI"])
+        .library(name: "EntityAuthUI", targets: ["EntityAuthUI"]),
+        .library(name: "EntityDocsSwift", targets: ["EntityDocsSwift"])
     ],
     dependencies: [
-        .package(url: "https://github.com/entityauth/convex-swift.git", from: "0.1.0")
+        .package(url: "https://github.com/entityauth/convex-swift.git", from: "0.1.0"),
+        .package(url: "https://github.com/apple/swift-markdown.git", from: "0.3.0")
     ],
     targets: [
         .target(
@@ -55,10 +57,17 @@ let package = Package(
                 "EntityAuthCore",
                 "EntityAuthNetworking",
                 "EntityAuthDomain",
-                "EntityAuthRealtime"
+                "EntityAuthRealtime",
+                "EntityDocsSwift"
             ],
             resources: [
                 .process("Resources")
+            ]
+        ),
+        .target(
+            name: "EntityDocsSwift",
+            dependencies: [
+                .product(name: "Markdown", package: "swift-markdown")
             ]
         ),
         .testTarget(

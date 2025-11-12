@@ -1,4 +1,5 @@
 import SwiftUI
+import EntityDocsSwift
 
 public struct GalleryView: View {
     @State private var query: String = ""
@@ -63,6 +64,10 @@ private struct Preview: View {
                 .padding(.vertical, 8)
         case .organizationSwitcher:
             OrganizationSwitcherView()
+                .frame(minHeight: 300)
+                .padding(.vertical, 8)
+        case .docsViewer:
+            DocsViewerView()
                 .frame(minHeight: 300)
                 .padding(.vertical, 8)
         }

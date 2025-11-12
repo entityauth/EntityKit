@@ -7,6 +7,7 @@ public enum ComponentKind: String, CaseIterable, Sendable {
     case organizationDisplay = "organization-display"
     case message = "message"
     case organizationSwitcher = "organization-switcher"
+    case docsViewer = "docs-viewer"
 }
 
 public struct ComponentItem: Identifiable, Sendable, Equatable, Hashable {
@@ -67,6 +68,14 @@ public let componentRegistry: [ComponentItem] = [
         keywords: ["org", "organization", "switch"],
         group: "Core",
         component: .organizationSwitcher
+    ),
+    .init(
+        title: "Docs Viewer",
+        slug: ["docs", "viewer"],
+        description: "MDX-based documentation and changelog viewer",
+        keywords: ["docs", "documentation", "changelog", "mdx", "markdown"],
+        group: "EntityDocs",
+        component: .docsViewer
     )
 ]
 

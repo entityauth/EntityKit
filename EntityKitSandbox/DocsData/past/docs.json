@@ -1,0 +1,795 @@
+[
+  {
+    "slug": [],
+    "url": "/",
+    "frontmatter": {
+      "title": "Welcome to Past",
+      "description": "The unified productivity platform for notes, tasks, feed, and chat"
+    },
+    "content": {
+      "type": "root",
+      "children": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Past is a modern productivity platform that brings together notes, task management, social feeds, and real-time chat into one unified experience. Built with a flexible page-based architecture, Past adapts to how you work—whether you're writing, planning, collaborating, or sharing."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "what-is-past",
+          "children": [
+            {
+              "type": "text",
+              "value": "What is Past?"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Past is a cross-platform productivity application that combines:"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "children": [
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "📝 Notes"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Rich text editor with blocks, hierarchical pages, and powerful editing"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "✅ Tasks"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Project and issue management with nested hierarchies"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "📰 Feed"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Social feed for sharing posts and updates"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "💬 Chat"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Real-time conversations and messaging"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "📊 Dashboard"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Unified overview of all your work"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Everything in Past is built on a unified "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "type": "text",
+                  "value": "page model"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "value": "—notes, tasks, posts, projects, and issues are all pages with different types, giving you flexibility and consistency across features."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "key-features",
+          "children": [
+            {
+              "type": "text",
+              "value": "Key Features"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 3,
+          "id": "unified-page-model",
+          "children": [
+            {
+              "type": "text",
+              "value": "Unified Page Model"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Past uses a flexible page-based architecture where everything—notes, tasks, posts, projects, issues—is stored as a \"page\" with a "
+            },
+            {
+              "type": "inlineCode",
+              "value": "docType"
+            },
+            {
+              "type": "text",
+              "value": " field. This unified model provides:"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "children": [
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Consistency"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Same data structure across all features"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Flexibility"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Easy to extend with new document types"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Hierarchy"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Natural parent-child relationships"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Rich Content"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Blocks-based editing for all content types"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 3,
+          "id": "cross-platform",
+          "children": [
+            {
+              "type": "text",
+              "value": "Cross-Platform"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Past runs natively on:"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "children": [
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Web"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Access from any browser with real-time updates"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "iOS"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Native app with full feature parity"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "macOS"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Native desktop app with window management and keyboard shortcuts"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Your data syncs automatically across all platforms, so you can pick up where you left off on any device."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 3,
+          "id": "real-time-collaboration",
+          "children": [
+            {
+              "type": "text",
+              "value": "Real-Time Collaboration"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Past keeps everything in sync:"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "children": [
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Instant Updates"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Changes appear immediately across all your devices"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Live Collaboration"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": See updates from your team in real-time"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Offline Support"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Native apps work offline and sync when you reconnect"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 3,
+          "id": "rich-content-editing",
+          "children": [
+            {
+              "type": "text",
+              "value": "Rich Content Editing"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Past's block-based editor supports:"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "children": [
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Rich Text"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Formatted paragraphs with inline styles"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "HTML Blocks"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Custom HTML content"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Attachments"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Files, images, videos with metadata"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Page References"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Link to other pages in your workspace"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Block References"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Reference specific blocks from other pages"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "children": [
+                {
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "type": "strong",
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "Nested Blocks"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "value": ": Hierarchical content structure"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "getting-started",
+          "children": [
+            {
+              "type": "text",
+              "value": "Getting Started"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Past is available on web, iOS, and macOS. Once you sign in, you can start creating notes, tasks, posts, and conversations right away. Your data syncs automatically across all your devices."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "faq",
+          "children": [
+            {
+              "type": "text",
+              "value": "FAQ"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "next-steps",
+          "children": [
+            {
+              "type": "text",
+              "value": "Next Steps"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Ready to get started? Sign in to Past and explore the dashboard. You can create your first note, set up a project, or start a conversation right away."
+            }
+          ]
+        }
+      ]
+    },
+    "toc": [
+      {
+        "title": "What is Past?",
+        "id": "what-is-past",
+        "depth": 2,
+        "children": []
+      },
+      {
+        "title": "Key Features",
+        "id": "key-features",
+        "depth": 2,
+        "children": [
+          {
+            "title": "Unified Page Model",
+            "id": "unified-page-model",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "title": "Cross-Platform",
+            "id": "cross-platform",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "title": "Real-Time Collaboration",
+            "id": "real-time-collaboration",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "title": "Rich Content Editing",
+            "id": "rich-content-editing",
+            "depth": 3,
+            "children": []
+          }
+        ]
+      },
+      {
+        "title": "Getting Started",
+        "id": "getting-started",
+        "depth": 2,
+        "children": []
+      },
+      {
+        "title": "FAQ",
+        "id": "faq",
+        "depth": 2,
+        "children": []
+      },
+      {
+        "title": "Next Steps",
+        "id": "next-steps",
+        "depth": 2,
+        "children": []
+      }
+    ]
+  }
+]
