@@ -68,6 +68,10 @@ let package = Package(
             name: "EntityDocsSwift",
             dependencies: [
                 .product(name: "Markdown", package: "swift-markdown")
+            ],
+            resources: [
+                .copy("Resources/past"),
+                .copy("Resources/entity-auth")
             ]
         ),
         .testTarget(

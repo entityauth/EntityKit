@@ -70,9 +70,18 @@ public struct DocsView: View {
         selectedPage = nil // Clear selected page when switching
         
         do {
-            let loadedPages = isChangelog 
+            var loadedPages = isChangelog 
                 ? try loader.loadChangelog(appName: appName)
                 : try loader.loadDocs(appName: appName)
+            
+            // Filter out "unreleased" from changelog (already done in loadChangelog, but double-check)
+            if isChangelog {
+                loadedPages = loadedPages.filter { page in
+                    let slugString = page.slug.joined(separator: "/")
+                    return slugString != "unreleased" && !slugString.contains("unreleased")
+                }
+            }
+            
             pages = loadedPages
             
             if let initialSlug = initialSlug {

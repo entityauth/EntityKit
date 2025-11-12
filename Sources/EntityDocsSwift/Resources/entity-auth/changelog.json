@@ -1,0 +1,142 @@
+[
+  {
+    "slug": [
+      "coming-soon"
+    ],
+    "url": "/coming-soon",
+    "frontmatter": {
+      "title": "Coming Soon",
+      "version": "coming-soon",
+      "date": "TBD"
+    },
+    "content": {
+      "type": "root",
+      "children": [
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "coming-soon",
+          "children": [
+            {
+              "type": "text",
+              "value": "Coming Soon"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "We're working on exciting updates! Check back soon for the latest changes and improvements."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "what-to-expect",
+          "children": [
+            {
+              "type": "text",
+              "value": "What to Expect"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Stay tuned for new features, improvements, and bug fixes."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "stay-updated",
+          "children": [
+            {
+              "type": "text",
+              "value": "Stay Updated"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "Follow our progress and get notified when new updates are released."
+            }
+          ]
+        }
+      ]
+    },
+    "toc": [
+      {
+        "title": "Coming Soon",
+        "id": "coming-soon",
+        "depth": 2,
+        "children": []
+      },
+      {
+        "title": "What to Expect",
+        "id": "what-to-expect",
+        "depth": 2,
+        "children": []
+      },
+      {
+        "title": "Stay Updated",
+        "id": "stay-updated",
+        "depth": 2,
+        "children": []
+      }
+    ]
+  },
+  {
+    "slug": [
+      "unreleased"
+    ],
+    "url": "/unreleased",
+    "frontmatter": {
+      "title": "Unreleased",
+      "version": "unreleased",
+      "date": "TBD"
+    },
+    "content": {
+      "type": "root",
+      "children": [
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "coming-soon",
+          "children": [
+            {
+              "type": "text",
+              "value": "Coming Soon"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "This section tracks changes that are not yet released."
+            }
+          ]
+        }
+      ]
+    },
+    "toc": [
+      {
+        "title": "Coming Soon",
+        "id": "coming-soon",
+        "depth": 2,
+        "children": []
+      }
+    ]
+  }
+]

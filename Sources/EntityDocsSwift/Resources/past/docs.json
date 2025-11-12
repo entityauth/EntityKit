@@ -1,0 +1,43 @@
+[
+  {
+    "slug": [],
+    "url": "/",
+    "frontmatter": {
+      "title": "Coming Soon",
+      "description": "Documentation coming soon"
+    },
+    "content": {
+      "type": "root",
+      "children": [
+        {
+          "type": "heading",
+          "depth": 2,
+          "id": "coming-soon",
+          "children": [
+            {
+              "type": "text",
+              "value": "Coming Soon"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "value": "We're working on comprehensive documentation! Check back soon for guides, tutorials, and API references."
+            }
+          ]
+        }
+      ]
+    },
+    "toc": [
+      {
+        "title": "Coming Soon",
+        "id": "coming-soon",
+        "depth": 2,
+        "children": []
+      }
+    ]
+  }
+]
