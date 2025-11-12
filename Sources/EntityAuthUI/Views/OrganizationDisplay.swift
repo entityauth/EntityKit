@@ -127,7 +127,8 @@ public struct OrganizationDisplay: View {
     
     private var detailsText: some View {
         HStack(spacing: 4) {
-            Text("\(organization.memberCount) members")
+            let memberCount = organization.memberCount ?? 0
+            Text("\(memberCount) members")
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(.secondary)
             

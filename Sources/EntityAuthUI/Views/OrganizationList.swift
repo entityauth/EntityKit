@@ -465,7 +465,7 @@ public struct OrganizationList: View {
         do {
             try await ea.switchOrganization(id: orgId)
             activeOrgId = orgId
-            try? await load()
+            await load()
         } catch {
             self.error = error.localizedDescription
         }
@@ -481,7 +481,7 @@ public struct OrganizationList: View {
             try await ea.createOrganization(name: name, slug: slug, ownerId: userId)
             newOrgName = ""
             newOrgSlug = ""
-            try? await load()
+            await load()
             if let created = organizations.first(where: { ($0.slug ?? "") == slug })?.orgId {
                 await switchTo(orgId: created)
             } else if let first = organizations.first?.orgId {
@@ -535,7 +535,7 @@ public struct OrganizationList: View {
                 throw error
             }
             editingOrganization = nil
-            try? await load()
+            await load()
         } catch {
             self.error = error.localizedDescription
             print("[OrganizationList] save error: \(error)")

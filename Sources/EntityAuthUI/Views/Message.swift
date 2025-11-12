@@ -124,10 +124,10 @@ public struct Message<Content: View>: View {
         .task {
             await resolveAuthorIfNeeded()
         }
-        .onChange(of: authorId) { _ in
+        .onChange(of: authorId) { _, _ in
             Task { await resolveAuthorIfNeeded() }
         }
-        .onChange(of: workspaceTenantId) { _ in
+        .onChange(of: workspaceTenantId) { _, _ in
             Task { await resolveAuthorIfNeeded() }
         }
     }

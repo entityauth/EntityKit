@@ -253,7 +253,7 @@ public extension AnyEntityAuthProvider {
         return AnyEntityAuthProvider(
             stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap); continuation.finish() } } },
             current: { await state.current() },
-            organizations: { try await state.organizations() },
+            organizations: { await state.organizations() },
             baseURL: { URL(string: "https://example.com")! },
             tenantId: { nil },
             ssoCallbackURL: { nil },
@@ -336,7 +336,7 @@ public extension AnyEntityAuthProvider {
         return AnyEntityAuthProvider(
             stream: { AsyncStream { continuation in Task { let snap = await state.current(); continuation.yield(snap); continuation.finish() } } },
             current: { await state.current() },
-            organizations: { try await state.organizations() },
+            organizations: { await state.organizations() },
             baseURL: { URL(string: "https://example.com")! },
             tenantId: { nil },
             ssoCallbackURL: { nil },

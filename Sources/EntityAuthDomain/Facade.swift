@@ -155,6 +155,10 @@ public actor EntityAuthFacade {
     private var hasPendingEmission: Bool = false
     private var onAuthenticatedCallback: ((Snapshot) -> Void)?
     private var onAuthenticationInvalidatedCallback: ((String) -> Void)?
+    // Lightweight in-memory cache for workspace members with in-flight deduplication
+    private var workspaceMembersCache: [String: (members: [WorkspaceMemberDTO], ts: Double)] = [:]
+    private var workspaceMembersInflight: [String: Task<[WorkspaceMemberDTO], Error>] = [:]
+    private let workspaceMembersTTLSeconds: Double = 15
 
     public var snapshotPublisher: AnyPublisher<Snapshot, Never> {
         subject.eraseToAnyPublisher()
@@ -650,7 +654,26 @@ public actor EntityAuthFacade {
     
     // MARK: - Workspace members
     public func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO] {
-        try await dependencies.organizationService.listWorkspaceMembers(workspaceTenantId: workspaceTenantId)
+        let now = Date().timeIntervalSince1970
+        if let cached = workspaceMembersCache[workspaceTenantId],
+           (now - cached.ts) < workspaceMembersTTLSeconds {
+            return cached.members
+        }
+        if let inFlight = workspaceMembersInflight[workspaceTenantId] {
+            return try await inFlight.value
+        }
+        let task = Task<[WorkspaceMemberDTO], Error> {
+            let members = try await dependencies.organizationService.listWorkspaceMembers(workspaceTenantId: workspaceTenantId)
+            await self.updateWorkspaceMembersCache(tenant: workspaceTenantId, members: members, ts: Date().timeIntervalSince1970)
+            return members
+        }
+        workspaceMembersInflight[workspaceTenantId] = task
+        defer { workspaceMembersInflight.removeValue(forKey: workspaceTenantId) }
+        return try await task.value
+    }
+
+    private func updateWorkspaceMembersCache(tenant: String, members: [WorkspaceMemberDTO], ts: Double) {
+        workspaceMembersCache[tenant] = (members: members, ts: ts)
     }
     // MARK: - Invitations (New System)
     public func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] {
