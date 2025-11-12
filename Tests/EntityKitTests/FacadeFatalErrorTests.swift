@@ -86,6 +86,7 @@ final class FacadeFatalErrorTests: XCTestCase {
         func switchActive(orgId: String) async throws -> String { throw EntityAuthError.configurationMissingBaseURL }
         func switchOrg(orgId: String) async throws -> String { throw EntityAuthError.configurationMissingBaseURL }
         func switchActive(workspaceTenantId: String, orgId: String) async throws -> String { throw EntityAuthError.configurationMissingBaseURL }
+        func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO] { [] }
         func list() async throws -> [OrganizationSummaryDTO] { [] }
         func list(userId: String?) async throws -> [OrganizationSummaryDTO] { [] }
         func active() async throws -> ActiveOrganizationDTO? { nil }
@@ -142,14 +143,23 @@ final class FacadeFatalErrorTests: XCTestCase {
     }
     
     final class MockInvitationService: InvitationsProviding, @unchecked Sendable {
-        func listReceived(for userId: String) async throws -> [Invitation] { [] }
-        func listSent(by inviterId: String) async throws -> [Invitation] { [] }
-        func send(orgId: String, inviteeId: String, role: String) async throws {}
-        func accept(invitationId: String) async throws {}
+        func start(orgId: String, inviteeUserId: String, role: String) async throws -> InvitationStartResponse {
+            InvitationStartResponse(id: "", token: "", expiresAt: 0)
+        }
+        func accept(token: String) async throws {}
+        func acceptById(invitationId: String) async throws {}
         func decline(invitationId: String) async throws {}
         func revoke(invitationId: String) async throws {}
-        func findUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? { nil }
-        func findUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] { [] }
+        func resend(invitationId: String) async throws -> InvitationStartResponse {
+            InvitationStartResponse(id: "", token: "", expiresAt: 0)
+        }
+        func listSent(inviterId: String, cursor: String?, limit: Int = 20) async throws -> InvitationListResponse {
+            InvitationListResponse(items: [], hasMore: false, nextCursor: nil)
+        }
+        func listReceived(userId: String, cursor: String?, limit: Int = 20) async throws -> InvitationListResponse {
+            InvitationListResponse(items: [], hasMore: false, nextCursor: nil)
+        }
+        func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] { [] }
     }
     
     func makeDependencies(
