@@ -11,6 +11,8 @@ public struct OrganizationMembersList: View {
 
     @State private var loading = false
     @State private var members: [OrgMemberDTO] = []
+    @State private var workspaceMembers: [WorkspaceMemberDTO] = []
+    @State private var loadingWorkspaceMembers = false
     @State private var error: String?
 
     public init(orgId: String, canManage: Bool, currentUserId: String?) {
@@ -30,7 +32,7 @@ public struct OrganizationMembersList: View {
                         .buttonStyle(.bordered)
                 }
             }
-            if loading {
+            if loading || loadingWorkspaceMembers {
                 ProgressView().padding(.vertical, 12)
             } else if members.isEmpty {
                 roundedInfo("No members yet")
@@ -38,7 +40,7 @@ public struct OrganizationMembersList: View {
                 ForEach(members, id: \.userId) { m in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(m.userId)
+                            Text(workspaceMemberName(for: m.userId) ?? m.userId)
                                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
                             Text("Role: \(m.role)")
                                 .font(.system(.caption, design: .rounded))
@@ -61,7 +63,31 @@ public struct OrganizationMembersList: View {
                 Text(error).foregroundStyle(.red).font(.caption)
             }
         }
-        .onAppear { Task { await refresh() } }
+        .onAppear {
+            Task {
+                await refresh()
+                await refreshWorkspaceMembers()
+            }
+        }
+    }
+    
+    private func workspaceMemberName(for userId: String) -> String? {
+        workspaceMembers.first(where: { $0.id == userId })?.username ?? 
+        workspaceMembers.first(where: { $0.id == userId })?.email
+    }
+    
+    private func refreshWorkspaceMembers() async {
+        loadingWorkspaceMembers = true
+        defer { loadingWorkspaceMembers = false }
+        do {
+            let snapshot = await ea.currentSnapshot()
+            guard let workspaceTenantId = snapshot.activeOrganization?.workspaceTenantId else {
+                return
+            }
+            workspaceMembers = try await ea.listWorkspaceMembers(workspaceTenantId: workspaceTenantId)
+        } catch {
+            // Silently fail
+        }
     }
 
     @ViewBuilder

@@ -33,6 +33,7 @@ public struct AnyEntityAuthProvider: Sendable {
     // Members
     private let _listMembers: @Sendable (_ orgId: String) async throws -> [OrgMemberDTO]
     private let _removeMember: @Sendable (_ orgId: String, _ userId: String) async throws -> Void
+    private let _listWorkspaceMembers: @Sendable (_ workspaceTenantId: String) async throws -> [WorkspaceMemberDTO]
     // Invitations
     private let _inviteSearchUser: @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?
     private let _inviteSearchUsers: @Sendable (_ q: String) async throws -> [(id: String, email: String?, username: String?)]
@@ -69,6 +70,7 @@ public struct AnyEntityAuthProvider: Sendable {
         setOrgImageUrl: @escaping @Sendable (_ imageUrl: String) async throws -> Void,
         listMembers: @escaping @Sendable (_ orgId: String) async throws -> [OrgMemberDTO],
         removeMember: @escaping @Sendable (_ orgId: String, _ userId: String) async throws -> Void,
+        listWorkspaceMembers: @escaping @Sendable (_ workspaceTenantId: String) async throws -> [WorkspaceMemberDTO],
         inviteSearchUser: @escaping @Sendable (_ email: String?, _ username: String?) async throws -> (id: String, email: String?, username: String?)?,
         inviteSearchUsers: @escaping @Sendable (_ q: String) async throws -> [(id: String, email: String?, username: String?)],
         invitationsReceived: @escaping @Sendable (_ userId: String) async throws -> [Invitation],
@@ -103,6 +105,7 @@ public struct AnyEntityAuthProvider: Sendable {
         self._setOrgImageUrl = setOrgImageUrl
         self._listMembers = listMembers
         self._removeMember = removeMember
+        self._listWorkspaceMembers = listWorkspaceMembers
         self._inviteSearchUser = inviteSearchUser
         self._inviteSearchUsers = inviteSearchUsers
         self._invitationsReceived = invitationsReceived
@@ -138,6 +141,7 @@ public struct AnyEntityAuthProvider: Sendable {
     public func setOrganizationImageUrl(_ imageUrl: String) async throws { try await _setOrgImageUrl(imageUrl) }
     public func listMembers(orgId: String) async throws -> [OrgMemberDTO] { try await _listMembers(orgId) }
     public func removeMember(orgId: String, userId: String) async throws { try await _removeMember(orgId, userId) }
+    public func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO] { try await _listWorkspaceMembers(workspaceTenantId) }
     public func inviteSearchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? { try await _inviteSearchUser(email, username) }
     public func inviteSearchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] { try await _inviteSearchUsers(q) }
     public func invitationsReceived(userId: String) async throws -> [Invitation] { try await _invitationsReceived(userId) }
@@ -196,6 +200,7 @@ public extension AnyEntityAuthProvider {
             setOrgImageUrl: { value in try await facade.setOrganizationImageUrl(value) },
             listMembers: { orgId in try await facade.listOrganizationMembers(orgId: orgId) },
             removeMember: { orgId, userId in try await facade.removeOrganizationMember(orgId: orgId, userId: userId) },
+            listWorkspaceMembers: { workspaceTenantId in try await facade.listWorkspaceMembers(workspaceTenantId: workspaceTenantId) },
             inviteSearchUser: { email, username in try await facade.searchUser(email: email, username: username) },
             inviteSearchUsers: { q in try await facade.searchUsers(q: q) },
             invitationsReceived: { userId in try await facade.listInvitationsReceived(for: userId) },
@@ -266,6 +271,7 @@ public extension AnyEntityAuthProvider {
             setOrgImageUrl: { _ in },
             listMembers: { _ in [] },
             removeMember: { _, _ in },
+            listWorkspaceMembers: { _ in [] },
             inviteSearchUser: { _, _ in nil },
             inviteSearchUsers: { _ in [] },
             invitationsReceived: { _ in [] },
@@ -347,6 +353,7 @@ public extension AnyEntityAuthProvider {
             setOrgImageUrl: { _ in },
             listMembers: { _ in [] },
             removeMember: { _, _ in },
+            listWorkspaceMembers: { _ in [] },
             inviteSearchUser: { _, _ in nil },
             inviteSearchUsers: { _ in [] },
             invitationsReceived: { _ in [] },

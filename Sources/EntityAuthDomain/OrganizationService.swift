@@ -18,6 +18,7 @@ public protocol OrganizationsProviding: Sendable {
     func switchActive(orgId: String) async throws -> String
     func switchOrg(orgId: String) async throws -> String
     func switchActive(workspaceTenantId: String, orgId: String) async throws -> String
+    func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO]
     func list() async throws -> [OrganizationSummaryDTO]
     func list(userId: String?) async throws -> [OrganizationSummaryDTO]
     func bootstrap() async throws -> BootstrapResponse
@@ -99,6 +100,27 @@ public final class OrganizationService: OrganizationsProviding {
                 role: rel.attrs?["role"]?.stringValue ?? "member",
                 joinedAt: rel.attrs?["joinedAt"]?.doubleValue
             )
+        }
+    }
+    
+    /// Fetch all workspace members with their profiles (username, imageUrl, email)
+    public func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO] {
+        print("[EA][Swift][OrganizationService] listWorkspaceMembers begin tenant=\(workspaceTenantId)")
+        let request = APIRequest(
+            method: .get,
+            path: "/api/workspaces/\(workspaceTenantId)/members",
+            requiresAuthentication: true
+        )
+        struct Response: Decodable {
+            let members: [WorkspaceMemberDTO]
+        }
+        do {
+            let response = try await client.send(request, decode: Response.self)
+            print("[EA][Swift][OrganizationService] listWorkspaceMembers success count=\(response.members.count)")
+            return response.members
+        } catch {
+            print("[EA][Swift][OrganizationService] listWorkspaceMembers ERROR: \(error)")
+            throw error
         }
     }
 

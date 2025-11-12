@@ -1,4 +1,5 @@
 import SwiftUI
+import EntityAuthDomain
 
 /// A composable chat message component with support for custom content, authors, and actions.
 /// Provides pre-built layouts for common chat message patterns with beautiful styling.
@@ -18,6 +19,8 @@ public struct Message<Content: View>: View {
     }
     
     private let author: MessageAuthor?
+    private let authorId: String?
+    private let workspaceTenantId: String?
     private let isCurrentUser: Bool
     private let timestamp: Date?
     private let layout: Layout
@@ -27,9 +30,16 @@ public struct Message<Content: View>: View {
     private let actions: MessageActions?
     private let content: Content
     
+    @Environment(\.entityAuthProvider) private var entityAuth
+    @State private var resolvedAuthor: MessageAuthor?
+    @State private var workspaceMembers: [WorkspaceMemberDTO] = []
+    @State private var isLoadingMembers = false
+    
     /// Create a composable message with custom content
     /// - Parameters:
-    ///   - author: Author information (name, avatar). Pass nil to use current user from environment
+    ///   - author: Author information (name, avatar). Pass nil to use current user from environment or resolve from workspace members
+    ///   - authorId: Author ID - if provided along with workspaceTenantId, author info will be resolved from workspace members
+    ///   - workspaceTenantId: Workspace tenant ID - required if authorId is provided
     ///   - isCurrentUser: Whether this message is from the current user (affects alignment and styling)
     ///   - timestamp: Optional timestamp to display
     ///   - layout: How to arrange the avatar and message
@@ -40,6 +50,8 @@ public struct Message<Content: View>: View {
     ///   - content: Custom content to display in the message bubble
     public init(
         author: MessageAuthor? = nil,
+        authorId: String? = nil,
+        workspaceTenantId: String? = nil,
         isCurrentUser: Bool = false,
         timestamp: Date? = nil,
         layout: Layout = .avatarInline,
@@ -50,6 +62,8 @@ public struct Message<Content: View>: View {
         @ViewBuilder content: () -> Content
     ) {
         self.author = author
+        self.authorId = authorId
+        self.workspaceTenantId = workspaceTenantId
         self.isCurrentUser = isCurrentUser
         self.timestamp = timestamp
         self.layout = layout
@@ -58,6 +72,7 @@ public struct Message<Content: View>: View {
         self.showTimestamp = showTimestamp && timestamp != nil
         self.actions = actions
         self.content = content()
+        self._resolvedAuthor = State(initialValue: author)
     }
     
     public var body: some View {
@@ -75,6 +90,80 @@ public struct Message<Content: View>: View {
             if let actions = actions {
                 contextMenuContent(actions)
             }
+        }
+        .task {
+            await resolveAuthorIfNeeded()
+        }
+        .onChange(of: authorId) { _ in
+            Task { await resolveAuthorIfNeeded() }
+        }
+        .onChange(of: workspaceTenantId) { _ in
+            Task { await resolveAuthorIfNeeded() }
+        }
+    }
+    
+    @MainActor
+    private func resolveAuthorIfNeeded() async {
+        print("[EA][Swift][Message] resolveAuthorIfNeeded begin authorId=\(authorId ?? "nil") workspaceTenantId=\(workspaceTenantId ?? "nil")")
+        // If author is already provided, use it
+        if let author = author {
+            resolvedAuthor = author
+            print("[EA][Swift][Message] Using provided author id=\(author.id) name=\(author.name) hasAvatar=\(author.avatarURL != nil)")
+            return
+        }
+        
+        // If authorId and workspaceTenantId are provided, resolve from workspace members
+        guard let authorId = authorId else {
+            resolvedAuthor = nil
+            print("[EA][Swift][Message] Missing authorId or workspaceTenantId - avatar will be hidden")
+            return
+        }
+        // Derive tenant id to use: if provided workspaceTenantId is missing or looks like an orgId, fallback to active org's workspaceTenantId
+        var tenantIdToUse: String? = workspaceTenantId
+        let looksLikeOrgId = (tenantIdToUse?.hasPrefix("jd") ?? false) && (tenantIdToUse?.count ?? 0) > 12
+        if tenantIdToUse == nil || looksLikeOrgId {
+            do {
+                if let active = try await entityAuth.activeOrganization() {
+                    tenantIdToUse = active.workspaceTenantId
+                    print("[EA][Swift][Message] Fallback tenant from active org: \(tenantIdToUse ?? "nil")")
+                }
+            } catch {
+                print("[EA][Swift][Message] Failed to read activeOrganization: \(error)")
+            }
+        }
+        guard let resolvedTenant = tenantIdToUse else {
+            resolvedAuthor = nil
+            print("[EA][Swift][Message] No valid workspaceTenantId after fallback - avatar will be hidden")
+            return
+        }
+        
+        // Fetch workspace members if not already loaded
+        if workspaceMembers.isEmpty && !isLoadingMembers {
+            isLoadingMembers = true
+            defer { isLoadingMembers = false }
+            
+            do {
+                // Use the environment's entityAuth provider to fetch workspace members
+                workspaceMembers = try await entityAuth.listWorkspaceMembers(workspaceTenantId: resolvedTenant)
+                print("[EA][Swift][Message] Fetched workspace members count=\(workspaceMembers.count) sampleIds=\(workspaceMembers.prefix(3).map { $0.id }.joined(separator: ","))")
+            } catch {
+                // Silently fail - will show fallback
+                print("[EA][Swift][Message] ERROR fetching workspace members: \(error)")
+                return
+            }
+        }
+        
+        // Find the member matching authorId
+        if let member = workspaceMembers.first(where: { $0.id == authorId }) {
+            resolvedAuthor = MessageAuthor(
+                id: member.id,
+                name: member.username ?? member.email ?? member.id,
+                avatarURL: member.imageUrl
+            )
+            print("[EA][Swift][Message] Resolved author id=\(member.id) name=\(member.username ?? member.email ?? member.id) hasAvatar=\(member.imageUrl != nil)")
+        } else {
+            resolvedAuthor = nil
+            print("[EA][Swift][Message] No matching member for authorId=\(authorId)")
         }
     }
     
@@ -109,7 +198,7 @@ public struct Message<Content: View>: View {
             if alignment == .leading {
                 avatarView
                 VStack(alignment: .leading, spacing: 4) {
-                    if let author = author {
+                    if let author = resolvedAuthor ?? author {
                         Text(author.name)
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(.secondary)
@@ -123,7 +212,7 @@ public struct Message<Content: View>: View {
             } else {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    if let author = author {
+                    if let author = resolvedAuthor ?? author {
                         Text(author.name)
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(.secondary)
@@ -143,7 +232,7 @@ public struct Message<Content: View>: View {
             HStack(spacing: 8) {
                 if alignment == .leading {
                     avatarView
-                    if let author = author {
+                    if let author = resolvedAuthor ?? author {
                         Text(author.name)
                             .font(.system(.subheadline, design: .rounded, weight: .semibold))
                             .foregroundStyle(.primary)
@@ -159,7 +248,7 @@ public struct Message<Content: View>: View {
                             .padding(.leading, 4)
                     }
                     Spacer()
-                    if let author = author {
+                    if let author = resolvedAuthor ?? author {
                         Text(author.name)
                             .font(.system(.subheadline, design: .rounded, weight: .semibold))
                             .foregroundStyle(.primary)
@@ -184,7 +273,7 @@ public struct Message<Content: View>: View {
     
     @ViewBuilder
     private var avatarView: some View {
-        if let author = author {
+        if let author = resolvedAuthor ?? author {
             AvatarView(name: author.name, imageURL: author.avatarURL, size: 36)
         } else {
             // Fallback to environment provider for current user
@@ -395,18 +484,33 @@ private struct AvatarView: View {
                     switch phase {
                     case .empty:
                         placeholderAvatar
+                            .onAppear {
+                                print("[EA][Swift][AvatarView] Loading image url=\(imageURL)")
+                            }
                     case .success(let image):
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
+                            .onAppear {
+                                print("[EA][Swift][AvatarView] Image success url=\(imageURL)")
+                            }
                     case .failure:
                         placeholderAvatar
+                            .onAppear {
+                                print("[EA][Swift][AvatarView] Image failure url=\(imageURL)")
+                            }
                     @unknown default:
                         placeholderAvatar
+                            .onAppear {
+                                print("[EA][Swift][AvatarView] Image unknown phase url=\(imageURL)")
+                            }
                     }
                 }
             } else {
                 placeholderAvatar
+                    .onAppear {
+                        print("[EA][Swift][AvatarView] No imageURL, showing placeholder for name=\(name)")
+                    }
             }
         }
         .frame(width: size, height: size)

@@ -254,6 +254,13 @@ public struct UserByEmailRequest: Encodable {
     public let email: String
 }
 
+public struct WorkspaceMemberDTO: Decodable, Sendable {
+    public let id: String
+    public let username: String?
+    public let imageUrl: String?
+    public let email: String?
+}
+
 public struct GraphQLRequest: Encodable {
     public let query: String
     public let variables: [String: AnyCodable]

@@ -647,6 +647,11 @@ public actor EntityAuthFacade {
         try await dependencies.organizationService.removeMember(orgId: orgId, userId: userId)
         try? await refreshUserData()
     }
+    
+    // MARK: - Workspace members
+    public func listWorkspaceMembers(workspaceTenantId: String) async throws -> [WorkspaceMemberDTO] {
+        try await dependencies.organizationService.listWorkspaceMembers(workspaceTenantId: workspaceTenantId)
+    }
     // MARK: - Invitations
     public func searchUser(email: String?, username: String?) async throws -> (id: String, email: String?, username: String?)? {
         try await dependencies.invitationService.findUser(email: email, username: username)
