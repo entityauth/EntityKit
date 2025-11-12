@@ -9,11 +9,13 @@ public struct UserProfileGallery: View {
     public enum VariantTab: String, CaseIterable {
         case button = "Button Variants"
         case toolbar = "Toolbar Example"
+        case withDocs = "With Documentation"
         
         var icon: String {
             switch self {
             case .button: return "hand.tap"
             case .toolbar: return "menubar.rectangle"
+            case .withDocs: return "doc.text"
             }
         }
     }
@@ -35,6 +37,12 @@ public struct UserProfileGallery: View {
                     Label(VariantTab.toolbar.rawValue, systemImage: VariantTab.toolbar.icon)
                 }
                 .tag(VariantTab.toolbar)
+            
+            withDocsVariantView
+                .tabItem {
+                    Label(VariantTab.withDocs.rawValue, systemImage: VariantTab.withDocs.icon)
+                }
+                .tag(VariantTab.withDocs)
         }
         #else
         // macOS: Content with toolbar picker
@@ -44,6 +52,8 @@ public struct UserProfileGallery: View {
                 buttonVariantView
             case .toolbar:
                 toolbarVariantView
+            case .withDocs:
+                withDocsVariantView
             }
         }
         .toolbar {
@@ -171,6 +181,81 @@ public struct UserProfileGallery: View {
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(.tertiary.opacity(0.3), lineWidth: 1)
             )
+        }
+    }
+    
+    // MARK: - With Docs Variant View
+    
+    private var withDocsVariantView: some View {
+        ScrollView {
+            VStack(spacing: 32) {
+                VStack(alignment: .leading, spacing: 24) {
+                    // UserProfile with docs enabled (entity-auth)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("With Documentation (Entity Auth)")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        
+                        Text("Shows docs and changelog for 'entity-auth' app")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.tertiary)
+                        
+                        UserProfile(
+                            featureFlags: UserProfileFeatureFlags(
+                                showDocs: true,
+                                docsAppName: "entity-auth"
+                            )
+                        )
+                    }
+                    
+                    Divider()
+                    
+                    // UserProfile with docs enabled (past)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("With Documentation (Past)")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        
+                        Text("Shows docs and changelog for 'past' app")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.tertiary)
+                        
+                        UserProfile(
+                            featureFlags: UserProfileFeatureFlags(
+                                showDocs: true,
+                                docsAppName: "past"
+                            )
+                        )
+                    }
+                    
+                    Divider()
+                    
+                    // UserProfile with all features including docs
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("All Features + Documentation")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        
+                        Text("Includes preferences, security, delete account, and docs")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.tertiary)
+                        
+                        UserProfile(
+                            featureFlags: UserProfileFeatureFlags(
+                                showPreferences: true,
+                                showSecurity: true,
+                                showDeleteAccount: true,
+                                showDocs: true,
+                                docsAppName: "entity-auth"
+                            )
+                        )
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                
+                Spacer(minLength: 40)
+            }
         }
     }
 }

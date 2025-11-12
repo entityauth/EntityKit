@@ -1,5 +1,8 @@
 import SwiftUI
 import EntityAuthDomain
+#if canImport(EntityDocsSwift)
+import EntityDocsSwift
+#endif
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
@@ -11,15 +14,21 @@ public struct UserProfileFeatureFlags: Sendable {
     public let showPreferences: Bool
     public let showSecurity: Bool
     public let showDeleteAccount: Bool
+    public let showDocs: Bool
+    public let docsAppName: String? // e.g., "past", "entity-auth"
     
     public init(
         showPreferences: Bool = false,
         showSecurity: Bool = false,
-        showDeleteAccount: Bool = false
+        showDeleteAccount: Bool = false,
+        showDocs: Bool = false,
+        docsAppName: String? = nil
     ) {
         self.showPreferences = showPreferences
         self.showSecurity = showSecurity
         self.showDeleteAccount = showDeleteAccount
+        self.showDocs = showDocs
+        self.docsAppName = docsAppName
     }
     
     /// Default flags with only core sections enabled
@@ -99,6 +108,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
     case preferences
     case security
     case deleteAccount
+    case docs
+    case changelog
 
     var title: String {
         switch self {
@@ -108,6 +119,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         case .preferences: return "Preferences"
         case .security: return "Security"
         case .deleteAccount: return "Delete Account"
+        case .docs: return "Documentation"
+        case .changelog: return "Changelog"
         }
     }
 
@@ -119,6 +132,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         case .preferences: return "Settings"
         case .security: return "Lock"
         case .deleteAccount: return "DeleteX"
+        case .docs: return "system:doc.text" // Documentation icon (system icon)
+        case .changelog: return "system:clock.arrow.circlepath" // Changelog icon (system icon)
         }
     }
     
@@ -134,6 +149,10 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         }
         if flags.showDeleteAccount {
             sections.append(.deleteAccount)
+        }
+        if flags.showDocs && flags.docsAppName != nil {
+            sections.append(.docs)
+            sections.append(.changelog)
         }
         
         return sections
@@ -199,7 +218,7 @@ private struct UserProfileSheet: View {
                 }
             }
             .navigationDestination(for: ProfileSection.self) { section in
-                SectionDetail(section: section, isPresented: $isPresented)
+                SectionDetail(section: section, isPresented: $isPresented, featureFlags: featureFlags)
                     .toolbar {
                         #if os(iOS)
                         ToolbarItem(placement: .topBarLeading) {
@@ -278,10 +297,17 @@ private struct UserProfileSheet: View {
                     }
                 }) {
                     HStack(spacing: 10) {
-                        Image(section.iconName, bundle: .module)
-                            .resizable()
-                            .renderingMode(.original)
-                            .frame(width: 16, height: 16)
+                        Group {
+                            if section.iconName.hasPrefix("system:") {
+                                Image(systemName: String(section.iconName.dropFirst(7)))
+                                    .font(.system(size: 16, weight: .medium))
+                            } else {
+                                Image(section.iconName, bundle: .module)
+                                    .resizable()
+                                    .renderingMode(.original)
+                            }
+                        }
+                        .frame(width: 16, height: 16)
                         Text(section.title)
                             .font(.system(.subheadline, design: .rounded, weight: selected == section ? .semibold : .medium))
                         Spacer()
@@ -398,6 +424,10 @@ private struct UserProfileSheet: View {
                 securityDetailView
             case .deleteAccount:
                 deleteAccountDetailView
+            case .docs:
+                docsDetailView
+            case .changelog:
+                changelogDetailView
             }
         }
     }
@@ -548,6 +578,82 @@ private struct UserProfileSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
     }
+    
+    // MARK: - Docs Detail View
+    
+    private var docsDetailView: some View {
+        Group {
+            #if canImport(EntityDocsSwift)
+            if let appName = featureFlags.docsAppName {
+                DocsView(appName: appName, isChangelog: false)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "doc.text")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("Documentation")
+                        .font(.headline)
+                    Text("No app name configured")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+            }
+            #else
+            VStack(spacing: 16) {
+                Image(systemName: "doc.text")
+                    .font(.largeTitle)
+                    .foregroundColor(.secondary)
+                Text("Documentation")
+                    .font(.headline)
+                Text("EntityDocsSwift module not available")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            #endif
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+    
+    // MARK: - Changelog Detail View
+    
+    private var changelogDetailView: some View {
+        Group {
+            #if canImport(EntityDocsSwift)
+            if let appName = featureFlags.docsAppName {
+                DocsView(appName: appName, isChangelog: true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("Changelog")
+                        .font(.headline)
+                    Text("No app name configured")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+            }
+            #else
+            VStack(spacing: 16) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.largeTitle)
+                    .foregroundColor(.secondary)
+                Text("Changelog")
+                    .font(.headline)
+                Text("EntityDocsSwift module not available")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            #endif
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
 
     // MARK: - Reusable rows (iOS)
     private func sectionRow(_ section: ProfileSection) -> some View {
@@ -555,10 +661,17 @@ private struct UserProfileSheet: View {
             HStack(spacing: 16) {
                 // Section Info
                 HStack(spacing: 12) {
-                    Image(section.iconName, bundle: .module)
-                        .resizable()
-                        .renderingMode(.original)
-                        .frame(width: 20, height: 20)
+                    Group {
+                        if section.iconName.hasPrefix("system:") {
+                            Image(systemName: String(section.iconName.dropFirst(7)))
+                                .font(.system(size: 20, weight: .medium))
+                        } else {
+                            Image(section.iconName, bundle: .module)
+                                .resizable()
+                                .renderingMode(.original)
+                        }
+                    }
+                    .frame(width: 20, height: 20)
                     
                     Text(section.title)
                         .font(.system(.body, design: .rounded, weight: .semibold))
@@ -723,6 +836,7 @@ private struct SectionDetail: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.profileImageUploader) private var profileImageUploader
     @Binding var isPresented: Bool
+    let featureFlags: UserProfileFeatureFlags
     @State private var isEditingAccount: Bool = false
 
     var body: some View {
@@ -765,6 +879,32 @@ private struct SectionDetail: View {
                     
                 case .deleteAccount:
                     DeleteAccountContent()
+                    
+                case .docs:
+                    #if canImport(EntityDocsSwift)
+                    if let appName = featureFlags.docsAppName {
+                        DocsView(appName: appName, isChangelog: false)
+                    } else {
+                        Text("No app name configured")
+                            .foregroundColor(.secondary)
+                    }
+                    #else
+                    Text("EntityDocsSwift module not available")
+                        .foregroundColor(.secondary)
+                    #endif
+                    
+                case .changelog:
+                    #if canImport(EntityDocsSwift)
+                    if let appName = featureFlags.docsAppName {
+                        DocsView(appName: appName, isChangelog: true)
+                    } else {
+                        Text("No app name configured")
+                            .foregroundColor(.secondary)
+                    }
+                    #else
+                    Text("EntityDocsSwift module not available")
+                        .foregroundColor(.secondary)
+                    #endif
                 }
             }
             .padding()
