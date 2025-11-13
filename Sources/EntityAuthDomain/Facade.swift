@@ -668,13 +668,13 @@ public actor EntityAuthFacade {
             return try await inFlight.value
         }
         let task = Task<[WorkspaceMemberDTO], Error> {
-            let members = try await dependencies.organizationService.listWorkspaceMembers(workspaceTenantId: workspaceTenantId)
-            await self.updateWorkspaceMembersCache(tenant: workspaceTenantId, members: members, ts: Date().timeIntervalSince1970)
-            return members
+            try await dependencies.organizationService.listWorkspaceMembers(workspaceTenantId: workspaceTenantId)
         }
         workspaceMembersInflight[workspaceTenantId] = task
         defer { workspaceMembersInflight.removeValue(forKey: workspaceTenantId) }
-        return try await task.value
+        let members = try await task.value
+        updateWorkspaceMembersCache(tenant: workspaceTenantId, members: members, ts: Date().timeIntervalSince1970)
+        return members
     }
 
     private func updateWorkspaceMembersCache(tenant: String, members: [WorkspaceMemberDTO], ts: Double) {

@@ -162,6 +162,19 @@ final class FacadeFatalErrorTests: XCTestCase {
         func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] { [] }
     }
     
+    final class MockFriendService: FriendsProviding, @unchecked Sendable {
+        func start(targetUserId: String) async throws {}
+        func accept(requestId: String) async throws {}
+        func decline(requestId: String) async throws {}
+        func cancel(requestId: String) async throws {}
+        func listSent(requesterId: String, cursor: String?, limit: Int) async throws -> FriendRequestListResponse {
+            FriendRequestListResponse(items: [], hasMore: false, nextCursor: nil)
+        }
+        func listReceived(targetUserId: String, cursor: String?, limit: Int) async throws -> FriendRequestListResponse {
+            FriendRequestListResponse(items: [], hasMore: false, nextCursor: nil)
+        }
+    }
+    
     func makeDependencies(
         authService: MockAuthService,
         organizationService: MockOrganizationService,
@@ -174,6 +187,7 @@ final class FacadeFatalErrorTests: XCTestCase {
         let apiClient = MockAPIClient()
         let entitiesService = MockEntitiesService()
         let invitationService = MockInvitationService()
+        let friendService = MockFriendService()
         
         return EntityAuthFacade.Dependencies(
             config: config,
@@ -183,6 +197,7 @@ final class FacadeFatalErrorTests: XCTestCase {
             organizationService: organizationService,
             entitiesService: entitiesService,
             invitationService: invitationService,
+            friendService: friendService,
             refreshHandler: refresher,
             apiClient: apiClient,
             realtime: realtime

@@ -535,7 +535,9 @@ private struct AppPreferencesInstaller: ViewModifier {
                     isLoading: isLoading,
                     isSaving: isSaving,
                     onChange: { next in
-                        value = next
+                        Task { @MainActor in
+                            value = next
+                        }
                     },
                     onSave: {
                         let current = await MainActor.run { value }
