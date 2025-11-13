@@ -18,7 +18,7 @@ public struct UserProfileFeatureFlags: Sendable {
     public let docsAppName: String? // e.g., "past", "entity-auth"
     
     public init(
-        showPreferences: Bool = false,
+        showPreferences: Bool = true,
         showSecurity: Bool = false,
         showDeleteAccount: Bool = false,
         showDocs: Bool = false,

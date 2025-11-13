@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PreferencesSectionView: View {
+    @Environment(\.appPreferencesContext) private var prefs
     var showsHeader: Bool = true
 
     var body: some View {
@@ -16,47 +17,78 @@ struct PreferencesSectionView: View {
 }
 
 private struct PreferencesContent: View {
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.appPreferencesContext) private var prefs
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Appearance")
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Feature Preferences")
                 .font(.system(.headline, design: .rounded, weight: .semibold))
 
-            HStack(spacing: 12) {
-                themeButton(title: "Light", icon: "sun.max.fill", isSelected: false)
-                themeButton(title: "Dark", icon: "moon.fill", isSelected: true)
-                themeButton(title: "Auto", icon: "circle.lefthalf.filled", isSelected: false)
+            if prefs.isLoading || prefs.value == nil {
+                ProgressView().padding(.vertical, 8)
+                    .onAppear {
+                        print("[EntityKit][Preferences] Loading… isLoading=\(prefs.isLoading) valueIsNil=\(prefs.value == nil) hasOnChange=\(prefs.onChange != nil) hasOnSave=\(prefs.onSave != nil)")
+                    }
+            } else if let value = prefs.value {
+                preferenceRow(title: "Chat", subtitle: "Conversations and messaging", isOn: value.chat) { newVal in
+                    print("[EntityKit][Preferences] Toggle chat -> \(newVal)")
+                    var v = value; v.chat = newVal; prefs.onChange?(v)
+                }
+                preferenceRow(title: "Notes", subtitle: "Create and organize notes", isOn: value.notes) { newVal in
+                    print("[EntityKit][Preferences] Toggle notes -> \(newVal)")
+                    var v = value; v.notes = newVal; prefs.onChange?(v)
+                }
+                preferenceRow(title: "Tasks", subtitle: "Task management and tracking", isOn: value.tasks) { newVal in
+                    print("[EntityKit][Preferences] Toggle tasks -> \(newVal)")
+                    var v = value; v.tasks = newVal; prefs.onChange?(v)
+                }
+                preferenceRow(title: "Feed", subtitle: "Activity feed and updates", isOn: value.feed) { newVal in
+                    print("[EntityKit][Preferences] Toggle feed -> \(newVal)")
+                    var v = value; v.feed = newVal; prefs.onChange?(v)
+                }
+
+                Divider().padding(.vertical, 6)
+
+                Text("View Options")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                preferenceRow(title: "Global \"All\" View", subtitle: "Aggregate content across workspaces and personal space", isOn: value.globalViewEnabled) { newVal in
+                    print("[EntityKit][Preferences] Toggle globalViewEnabled -> \(newVal)")
+                    var v = value; v.globalViewEnabled = newVal; prefs.onChange?(v)
+                }
+
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        print("[EntityKit][Preferences] Save tapped (isSaving=\(prefs.isSaving))")
+                        Task { await prefs.onSave?() }
+                    }) {
+                        Text(prefs.isSaving ? "Saving…" : "Save Changes")
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    }
+                    .disabled(prefs.isSaving)
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(.top, 8)
             }
         }
     }
 
     @ViewBuilder
-    private func themeButton(title: String, icon: String, isSelected: Bool) -> some View {
-        Button(action: {
-            // TODO: Implement theme switching
-        }) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-
-                Text(title)
-                    .font(.system(.caption, design: .rounded, weight: .medium))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
+    private func preferenceRow(title: String, subtitle: String, isOn: Bool, onToggle: @escaping (Bool) -> Void) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(.body, design: .rounded, weight: .semibold))
+                Text(subtitle).font(.system(.footnote, design: .rounded)).foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.blue.opacity(0.15) : Color.secondary.opacity(0.1))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(isSelected ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 2)
-            )
+            Spacer()
+            Toggle("", isOn: Binding(get: { isOn }, set: onToggle))
+                .labelsHidden()
         }
-        .buttonStyle(.plain)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+        )
     }
 }
-

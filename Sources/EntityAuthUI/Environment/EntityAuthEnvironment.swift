@@ -412,3 +412,139 @@ public extension View {
     }
 }
 
+// MARK: - App Preferences Context
+
+/// Value container for application-specific feature preferences.
+public struct AppPreferencesValue: Equatable, Sendable {
+    public var chat: Bool
+    public var notes: Bool
+    public var tasks: Bool
+    public var feed: Bool
+    public var globalViewEnabled: Bool
+
+    public init(chat: Bool, notes: Bool, tasks: Bool, feed: Bool, globalViewEnabled: Bool) {
+        self.chat = chat
+        self.notes = notes
+        self.tasks = tasks
+        self.feed = feed
+        self.globalViewEnabled = globalViewEnabled
+    }
+}
+
+public struct AppPreferencesContext: Sendable {
+    public var value: AppPreferencesValue?
+    public var isLoading: Bool
+    public var isSaving: Bool
+    public var onChange: (@Sendable (AppPreferencesValue) -> Void)?
+    public var onSave: (@Sendable () async -> Void)?
+
+    public init(
+        value: AppPreferencesValue? = nil,
+        isLoading: Bool = false,
+        isSaving: Bool = false,
+        onChange: (@Sendable (AppPreferencesValue) -> Void)? = nil,
+        onSave: (@Sendable () async -> Void)? = nil
+    ) {
+        self.value = value
+        self.isLoading = isLoading
+        self.isSaving = isSaving
+        self.onChange = onChange
+        self.onSave = onSave
+    }
+}
+
+private struct AppPreferencesContextKey: EnvironmentKey {
+    static let defaultValue: AppPreferencesContext = .init()
+}
+
+public extension EnvironmentValues {
+    var appPreferencesContext: AppPreferencesContext {
+        get { self[AppPreferencesContextKey.self] }
+        set { self[AppPreferencesContextKey.self] = newValue }
+    }
+}
+
+public extension View {
+    func appPreferencesContext(_ ctx: AppPreferencesContext) -> some View {
+        environment(\.appPreferencesContext, ctx)
+    }
+}
+
+// MARK: - App Preferences Installer (Driver-based)
+
+/// A lightweight driver that knows how to load and save app preferences.
+/// Consumer apps implement this protocol against their own persistence/backend.
+public protocol AppPreferencesDriver: Sendable {
+    func load() async throws -> AppPreferencesValue
+    func save(_ value: AppPreferencesValue) async throws
+}
+
+private struct AppPreferencesInstaller: ViewModifier {
+    let driver: AppPreferencesDriver
+    @State private var value: AppPreferencesValue?
+    @State private var isLoading: Bool = false
+    @State private var isSaving: Bool = false
+
+    func body(content: Content) -> some View {
+        content
+            .appPreferencesContext(
+                AppPreferencesContext(
+                    value: value,
+                    isLoading: isLoading,
+                    isSaving: isSaving,
+                    onChange: { next in
+                        value = next
+                    },
+                    onSave: {
+                        let current = await MainActor.run { value }
+                        guard let current else { return }
+                        await MainActor.run { isSaving = true }
+                        do {
+                            try await driver.save(current)
+                            // Reload after save to ensure UI reflects persisted state
+                            let reloaded = try await driver.load()
+                            await MainActor.run {
+                                value = reloaded
+                                isSaving = false
+                            }
+                        } catch {
+                            // Intentionally ignore - consumer apps can observe/save errors elsewhere if desired
+                            await MainActor.run {
+                                isSaving = false
+                            }
+                        }
+                    }
+                )
+            )
+            .task {
+                var shouldSkip = false
+                await MainActor.run {
+                    if value != nil || isLoading {
+                        shouldSkip = true
+                    } else {
+                        isLoading = true
+                    }
+                }
+                if shouldSkip { return }
+                do {
+                    let loaded = try await driver.load()
+                    await MainActor.run {
+                        value = loaded
+                        isLoading = false
+                    }
+                } catch {
+                    // Intentionally ignore to avoid crashing UI; UI will continue to show loading/empty state
+                    await MainActor.run {
+                        isLoading = false
+                    }
+                }
+            }
+    }
+}
+
+public extension View {
+    /// Installs the App Preferences environment by delegating to a driver for load/save operations.
+    func installAppPreferences(driver: AppPreferencesDriver) -> some View {
+        modifier(AppPreferencesInstaller(driver: driver))
+    }
+}
