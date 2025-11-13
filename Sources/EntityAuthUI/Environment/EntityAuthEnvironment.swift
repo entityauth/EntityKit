@@ -44,6 +44,12 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _inviteResend: @Sendable (_ invitationId: String) async throws -> (token: String, expiresAt: Double)
     private let _invitationsReceived: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?)
     private let _invitationsSent: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?)
+    private let _friendStart: @Sendable (_ targetUserId: String) async throws -> Void
+    private let _friendAccept: @Sendable (_ requestId: String) async throws -> Void
+    private let _friendDecline: @Sendable (_ requestId: String) async throws -> Void
+    private let _friendCancel: @Sendable (_ requestId: String) async throws -> Void
+    private let _friendsReceived: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
+    private let _friendsSent: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
 
     public init(
         stream: @escaping @Sendable () async -> AsyncStream<Snapshot>,
@@ -80,7 +86,13 @@ public struct AnyEntityAuthProvider: Sendable {
         inviteRevoke: @escaping @Sendable (_ invitationId: String) async throws -> Void,
         inviteResend: @escaping @Sendable (_ invitationId: String) async throws -> (token: String, expiresAt: Double),
         invitationsReceived: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?),
-        invitationsSent: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?)
+        invitationsSent: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?),
+        friendStart: @escaping @Sendable (_ targetUserId: String) async throws -> Void,
+        friendAccept: @escaping @Sendable (_ requestId: String) async throws -> Void,
+        friendDecline: @escaping @Sendable (_ requestId: String) async throws -> Void,
+        friendCancel: @escaping @Sendable (_ requestId: String) async throws -> Void,
+        friendsReceived: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?),
+        friendsSent: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
     ) {
         self._stream = stream
         self._current = current
@@ -117,6 +129,12 @@ public struct AnyEntityAuthProvider: Sendable {
         self._inviteResend = inviteResend
         self._invitationsReceived = invitationsReceived
         self._invitationsSent = invitationsSent
+        self._friendStart = friendStart
+        self._friendAccept = friendAccept
+        self._friendDecline = friendDecline
+        self._friendCancel = friendCancel
+        self._friendsReceived = friendsReceived
+        self._friendsSent = friendsSent
     }
 
     public func snapshotStream() async -> AsyncStream<Snapshot> { await _stream() }
@@ -154,6 +172,12 @@ public struct AnyEntityAuthProvider: Sendable {
     public func inviteResend(invitationId: String) async throws -> (token: String, expiresAt: Double) { try await _inviteResend(invitationId) }
     public func invitationsReceived(cursor: String?, limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?) { try await _invitationsReceived(cursor, limit) }
     public func invitationsSent(cursor: String?, limit: Int) async throws -> (items: [Invitation], hasMore: Bool, nextCursor: String?) { try await _invitationsSent(cursor, limit) }
+    public func friendStart(targetUserId: String) async throws { try await _friendStart(targetUserId) }
+    public func friendAccept(requestId: String) async throws { try await _friendAccept(requestId) }
+    public func friendDecline(requestId: String) async throws { try await _friendDecline(requestId) }
+    public func friendCancel(requestId: String) async throws { try await _friendCancel(requestId) }
+    public func friendRequestsReceived(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) { try await _friendsReceived(cursor, limit) }
+    public func friendRequestsSent(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) { try await _friendsSent(cursor, limit) }
 }
 
 public extension AnyEntityAuthProvider {
@@ -213,7 +237,13 @@ public extension AnyEntityAuthProvider {
             inviteRevoke: { invitationId in try await facade.revokeInvitation(invitationId: invitationId) },
             inviteResend: { invitationId in try await facade.resendInvitation(invitationId: invitationId) },
             invitationsReceived: { cursor, limit in try await facade.listInvitationsReceived(cursor: cursor, limit: limit) },
-            invitationsSent: { cursor, limit in try await facade.listInvitationsSent(cursor: cursor, limit: limit) }
+            invitationsSent: { cursor, limit in try await facade.listInvitationsSent(cursor: cursor, limit: limit) },
+            friendStart: { targetUserId in try await facade.startFriendRequest(targetUserId: targetUserId) },
+            friendAccept: { requestId in try await facade.acceptFriendRequest(requestId: requestId) },
+            friendDecline: { requestId in try await facade.declineFriendRequest(requestId: requestId) },
+            friendCancel: { requestId in try await facade.cancelFriendRequest(requestId: requestId) },
+            friendsReceived: { cursor, limit in try await facade.listFriendRequestsReceived(cursor: cursor, limit: limit) },
+            friendsSent: { cursor, limit in try await facade.listFriendRequestsSent(cursor: cursor, limit: limit) }
         )
     }
 
@@ -285,7 +315,13 @@ public extension AnyEntityAuthProvider {
             inviteRevoke: { _ in },
             inviteResend: { _ in throw NSError(domain: "preview", code: -1) },
             invitationsReceived: { _, _ in ([], false, nil) },
-            invitationsSent: { _, _ in ([], false, nil) }
+            invitationsSent: { _, _ in ([], false, nil) },
+            friendStart: { _ in },
+            friendAccept: { _ in },
+            friendDecline: { _ in },
+            friendCancel: { _ in },
+            friendsReceived: { _, _ in ([], false, nil) },
+            friendsSent: { _, _ in ([], false, nil) }
         )
     }
 
@@ -368,7 +404,13 @@ public extension AnyEntityAuthProvider {
             inviteRevoke: { _ in },
             inviteResend: { _ in throw NSError(domain: "preview", code: -1) },
             invitationsReceived: { _, _ in ([], false, nil) },
-            invitationsSent: { _, _ in ([], false, nil) }
+            invitationsSent: { _, _ in ([], false, nil) },
+            friendStart: { _ in },
+            friendAccept: { _ in },
+            friendDecline: { _ in },
+            friendCancel: { _ in },
+            friendsReceived: { _, _ in ([], false, nil) },
+            friendsSent: { _, _ in ([], false, nil) }
         )
     }
 }

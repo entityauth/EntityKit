@@ -42,14 +42,34 @@ public struct UserProfileFeatureFlags: Sendable {
     )
 }
 
+public enum UserProfileModeIndicator: String, Sendable {
+    case personal
+    case work
+    case both
+}
+
+public enum UserProfilePeopleMode: String, Sendable {
+    case org
+    case friends
+    case both
+}
+
 public struct UserProfile: View {
     @State private var isPresented = false
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
     private let featureFlags: UserProfileFeatureFlags
+    private let modeIndicator: UserProfileModeIndicator?
+    private let peopleMode: UserProfilePeopleMode
 
-    public init(featureFlags: UserProfileFeatureFlags = .production) {
+    public init(
+        featureFlags: UserProfileFeatureFlags = .production,
+        modeIndicator: UserProfileModeIndicator? = nil,
+        peopleMode: UserProfilePeopleMode = .org
+    ) {
         self.featureFlags = featureFlags
+        self.modeIndicator = modeIndicator
+        self.peopleMode = peopleMode
     }
 
     public var body: some View {
@@ -58,7 +78,12 @@ public struct UserProfile: View {
         }
         .accessibilityLabel("Open user profile")
         .sheet(isPresented: $isPresented) {
-            UserProfileSheet(isPresented: $isPresented, featureFlags: featureFlags)
+            UserProfileSheet(
+                isPresented: $isPresented,
+                featureFlags: featureFlags,
+                modeIndicator: modeIndicator,
+                peopleMode: peopleMode
+            )
         }
     }
 }
@@ -68,6 +93,8 @@ public struct UserProfileToolbarButton: View {
     @State private var isPresented = false
     @Environment(\.entityAuthProvider) private var provider
     private let featureFlags: UserProfileFeatureFlags
+    private let modeIndicator: UserProfileModeIndicator?
+    private let peopleMode: UserProfilePeopleMode
     
     public enum Style {
         case avatar  // Shows user's avatar with initial letter
@@ -76,9 +103,16 @@ public struct UserProfileToolbarButton: View {
     
     private let style: Style
     
-    public init(style: Style = .avatar, featureFlags: UserProfileFeatureFlags = .production) {
+    public init(
+        style: Style = .avatar,
+        featureFlags: UserProfileFeatureFlags = .production,
+        modeIndicator: UserProfileModeIndicator? = nil,
+        peopleMode: UserProfilePeopleMode = .org
+    ) {
         self.style = style
         self.featureFlags = featureFlags
+        self.modeIndicator = modeIndicator
+        self.peopleMode = peopleMode
     }
     
     public var body: some View {
@@ -96,7 +130,12 @@ public struct UserProfileToolbarButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Open user profile")
         .sheet(isPresented: $isPresented) {
-            UserProfileSheet(isPresented: $isPresented, featureFlags: featureFlags)
+            UserProfileSheet(
+                isPresented: $isPresented,
+                featureFlags: featureFlags,
+                modeIndicator: modeIndicator,
+                peopleMode: peopleMode
+            )
         }
     }
 }
@@ -115,7 +154,7 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         switch self {
         case .account: return "Account"
         case .organizations: return "Organizations"
-        case .invitations: return "Invitations"
+        case .invitations: return "People"
         case .preferences: return "Preferences"
         case .security: return "Security"
         case .deleteAccount: return "Delete Account"
@@ -137,9 +176,22 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         }
     }
     
-    /// Returns sections that should be visible based on feature flags
-    static func visibleSections(with flags: UserProfileFeatureFlags) -> [ProfileSection] {
-        var sections: [ProfileSection] = [.account, .organizations, .invitations]
+    /// Returns sections that should be visible based on feature flags and mode.
+    /// - Parameters:
+    ///   - flags: Feature flags controlling optional sections.
+    ///   - modeIndicator: When `.personal`, we hide Organizations to keep the
+    ///     sheet focused on the single personal space. Work/Hybrid modes still
+    ///     expose organization management just like the web UI.
+    static func visibleSections(
+        with flags: UserProfileFeatureFlags,
+        modeIndicator: UserProfileModeIndicator?
+    ) -> [ProfileSection] {
+        var sections: [ProfileSection] = [.account, .invitations]
+        
+        // Only show Organizations when we are not explicitly in personal mode.
+        if modeIndicator != .personal {
+            sections.insert(.organizations, at: 1)
+        }
         
         if flags.showPreferences {
             sections.append(.preferences)
@@ -168,9 +220,23 @@ private struct UserProfileSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.profileImageUploader) private var profileImageUploader
     let featureFlags: UserProfileFeatureFlags
+    let modeIndicator: UserProfileModeIndicator?
+    let peopleMode: UserProfilePeopleMode
     
     private var visibleSections: [ProfileSection] {
-        ProfileSection.visibleSections(with: featureFlags)
+        ProfileSection.visibleSections(with: featureFlags, modeIndicator: modeIndicator)
+    }
+    
+    private var modeBadge: (label: String, color: Color)? {
+        guard let modeIndicator else { return nil }
+        switch modeIndicator {
+        case .personal:
+            return ("Personal space", .green)
+        case .work:
+            return ("Work mode", .blue)
+        case .both:
+            return ("Hybrid mode", .pink)
+        }
     }
 
     var body: some View {
@@ -189,6 +255,17 @@ private struct UserProfileSheet: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(spacing: 16) {
+                    if let badge = modeBadge {
+                        HStack {
+                            Circle()
+                                .fill(badge.color)
+                                .frame(width: 10, height: 10)
+                            Text(badge.label.uppercased())
+                                .font(.system(.caption, design: .rounded, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
                     // Section Cards
                     VStack(spacing: 12) {
                         ForEach(visibleSections, id: \.self) { section in
@@ -218,7 +295,12 @@ private struct UserProfileSheet: View {
                 }
             }
             .navigationDestination(for: ProfileSection.self) { section in
-                SectionDetail(section: section, isPresented: $isPresented, featureFlags: featureFlags)
+                SectionDetail(
+                    section: section,
+                    isPresented: $isPresented,
+                    featureFlags: featureFlags,
+                    peopleMode: peopleMode
+                )
                     .toolbar {
                         #if os(iOS)
                         ToolbarItem(placement: .topBarLeading) {
@@ -288,6 +370,17 @@ private struct UserProfileSheet: View {
     private var sidebar: some View {
         // Full-height container with concentricity: Base → Glass → Content
         VStack(spacing: 0) {
+            if let badge = modeBadge {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(badge.color)
+                        .frame(width: 10, height: 10)
+                    Text(badge.label.uppercased())
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(12)
+            }
             // Navigation Buttons
             VStack(spacing: 6) {
                 ForEach(visibleSections, id: \.self) { section in
@@ -468,7 +561,7 @@ private struct UserProfileSheet: View {
             Text("Invitations")
                 .font(.system(.title2, design: .rounded, weight: .semibold))
             
-            InvitationsContent()
+            PeopleContent(mode: peopleMode)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
@@ -722,6 +815,7 @@ private struct SectionDetail: View {
     @Environment(\.profileImageUploader) private var profileImageUploader
     @Binding var isPresented: Bool
     let featureFlags: UserProfileFeatureFlags
+    let peopleMode: UserProfilePeopleMode
     @State private var isEditingAccount: Bool = false
 
     var body: some View {
@@ -749,7 +843,7 @@ private struct SectionDetail: View {
                     OrganizationsSectionView(onDismiss: { isPresented = false }, showsHeader: false)
                     
                 case .invitations:
-                    InvitationsContent()
+                    PeopleContent(mode: peopleMode)
                     
                 case .preferences:
                     PreferencesSectionView(showsHeader: false)

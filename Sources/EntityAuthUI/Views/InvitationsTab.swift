@@ -1,6 +1,644 @@
 import SwiftUI
 import EntityAuthDomain
 
+struct PeopleContent: View {
+    @Environment(\.entityAuthProvider) private var ea
+    @Environment(\.colorScheme) private var colorScheme
+
+    let mode: UserProfilePeopleMode
+
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    @State private var searchText: String = ""
+    @State private var searchResults: [PersonResult] = []
+    @State private var isSearching = false
+
+    @State private var receivedInvites: [Invitation]? = nil
+    @State private var sentInvites: [Invitation]? = nil
+    @State private var inviteReceivedCursor: String?
+    @State private var inviteSentCursor: String?
+    @State private var inviteReceivedHasMore = false
+    @State private var inviteSentHasMore = false
+
+    @State private var friendReceived: [FriendRequest]? = nil
+    @State private var friendSent: [FriendRequest]? = nil
+    @State private var friendReceivedCursor: String?
+    @State private var friendSentCursor: String?
+    @State private var friendReceivedHasMore = false
+    @State private var friendSentHasMore = false
+
+    @State private var orgOptions: [OrganizationSummary] = []
+    @State private var selectedOrgId: String?
+
+    private var supportsOrg: Bool { mode != .friends }
+    private var supportsFriends: Bool { mode != .org }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                searchCard
+                if supportsOrg {
+                    inviteSection
+                }
+                if supportsFriends {
+                    friendSection
+                }
+            }
+            .padding()
+        }
+        .task {
+            await refreshAll()
+        }
+        .refreshable {
+            await refreshAll()
+        }
+    }
+
+    private var searchCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(titleForSearch)
+                .font(.headline)
+            TextField("Search people", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+            HStack(spacing: 8) {
+                Button("Search") {
+                    Task { await performSearch() }
+                }
+                .disabled(searchText.trimmingCharacters(in: .whitespaces).count < 2)
+                if isSearching {
+                    ProgressView()
+                }
+                Spacer()
+                if let errorMessage {
+                    Text(errorMessage ?? "")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            if !searchResults.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(searchResults) { result in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(result.displayName)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            if let email = result.email {
+                                Text(email)
+                                    .font(.footnote)
+                                    .foregroundColor(.secondary)
+                            }
+                            HStack(spacing: 8) {
+                                if supportsOrg {
+                                    Menu("Invite to org") {
+                                        ForEach(orgOptions, id: \.orgId) { org in
+                                            Button("\(org.name ?? org.slug ?? org.orgId)") {
+                                                Task { await invite(result.id, orgId: org.orgId) }
+                                            }
+                                        }
+                                    }
+                                    .disabled(orgOptions.isEmpty)
+                                }
+                                if supportsFriends {
+                                    Button("Add friend") {
+                                        Task { await startFriendRequest(result.id) }
+                                    }
+                                }
+                            }
+                            .font(.footnote)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(colorScheme == .dark ? 0.2 : 0.08)))
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.secondary.opacity(colorScheme == .dark ? 0.15 : 0.08))
+        )
+    }
+
+    private var inviteSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Organization invitations")
+                .font(.headline)
+            if isLoading && receivedInvites == nil && sentInvites == nil {
+                ProgressView()
+            } else {
+                VStack(spacing: 16) {
+                    invitationList(
+                        title: "Received",
+                        description: "Invites sent to you",
+                        items: receivedInvites,
+                        hasMore: inviteReceivedHasMore,
+                        loadMore: { await loadMoreInvitations(kind: .received) },
+                        actionBuilder: { invitation in
+                            if invitation.status == "pending" {
+                                return AnyView(
+                                    HStack {
+                                        Button("Accept") {
+                                            Task { await acceptInvitation(invitation.id) }
+                                        }
+                                        Button("Decline") {
+                                            Task { await declineInvitation(invitation.id) }
+                                        }
+                                    }
+                                )
+                            }
+                            return nil
+                        }
+                    )
+                    invitationList(
+                        title: "Sent",
+                        description: "Invites you've issued",
+                        items: sentInvites,
+                        hasMore: inviteSentHasMore,
+                        loadMore: { await loadMoreInvitations(kind: .sent) },
+                        actionBuilder: { invitation in
+                            if invitation.status == "pending" {
+                                return AnyView(
+                                    HStack {
+                                        Button("Revoke") {
+                                            Task { await revokeInvitation(invitation.id) }
+                                        }
+                                        Button("Resend") {
+                                            Task { await resendInvitation(invitation.id) }
+                                        }
+                                    }
+                                )
+                            }
+                            return nil
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    private var friendSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Friend requests")
+                .font(.headline)
+            VStack(spacing: 16) {
+                friendList(
+                    title: "Received",
+                    description: "People who want to connect",
+                    items: friendReceived,
+                    hasMore: friendReceivedHasMore,
+                    loadMore: { await loadMoreFriends(kind: .received) },
+                    actionBuilder: { request in
+                        if request.status == "pending" {
+                            return AnyView(
+                                HStack {
+                                    Button("Accept") {
+                                        Task { await acceptFriend(request.id) }
+                                    }
+                                    Button("Decline") {
+                                        Task { await declineFriend(request.id) }
+                                    }
+                                }
+                            )
+                        }
+                        return nil
+                    }
+                )
+                friendList(
+                    title: "Sent",
+                    description: "Requests you've sent",
+                    items: friendSent,
+                    hasMore: friendSentHasMore,
+                    loadMore: { await loadMoreFriends(kind: .sent) },
+                    actionBuilder: { request in
+                        if request.status == "pending" {
+                            return AnyView(
+                                Button("Cancel") {
+                                    Task { await cancelFriend(request.id) }
+                                }
+                            )
+                        }
+                        return nil
+                    }
+                )
+            }
+        }
+    }
+
+    private func invitationList(
+        title: String,
+        description: String,
+        items: [Invitation]?,
+        hasMore: Bool,
+        loadMore: @escaping () async -> Void,
+        actionBuilder: @escaping (Invitation) -> AnyView?
+    ) -> some View {
+        let listItems = items ?? []
+        return VStack(alignment: .leading, spacing: 12) {
+            header(title: title, description: description, count: listItems.count)
+            if isLoading && items == nil {
+                ProgressView()
+            } else if listItems.isEmpty {
+                emptyState("Nothing yet")
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(listItems, id: \.id) { invitation in
+                        InvitationRow(
+                            title: invitation.orgId,
+                            status: invitation.status,
+                            detail: invitation.role.capitalized,
+                            actionContent: actionBuilder(invitation)
+                        )
+                    }
+                    if hasMore {
+                        Button("Load more…") {
+                            Task { await loadMore() }
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.secondary.opacity(colorScheme == .dark ? 0.12 : 0.05)))
+    }
+
+    private func friendList(
+        title: String,
+        description: String,
+        items: [FriendRequest]?,
+        hasMore: Bool,
+        loadMore: @escaping () async -> Void,
+        actionBuilder: @escaping (FriendRequest) -> AnyView?
+    ) -> some View {
+        let listItems = items ?? []
+        return VStack(alignment: .leading, spacing: 12) {
+            header(title: title, description: description, count: listItems.count)
+            if isLoading && items == nil {
+                ProgressView()
+            } else if listItems.isEmpty {
+                emptyState("Nothing yet")
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(listItems, id: \.id) { request in
+                        InvitationRow(
+                            title: requestTitle(request),
+                            status: request.status,
+                            detail: nil,
+                            actionContent: actionBuilder(request)
+                        )
+                    }
+                    if hasMore {
+                        Button("Load more…") {
+                            Task { await loadMore() }
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.secondary.opacity(colorScheme == .dark ? 0.12 : 0.05)))
+    }
+
+    private func header(title: String, description: String, count: Int) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline).bold()
+                Text(description).font(.caption).foregroundColor(.secondary)
+            }
+            Spacer()
+            Text("\(count)")
+                .font(.caption2)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.secondary.opacity(colorScheme == .dark ? 0.2 : 0.1)))
+        }
+    }
+
+    private func emptyState(_ message: String) -> some View {
+        Text(message)
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.2)))
+    }
+
+    private func InvitationRow(
+        title: String,
+        status: String,
+        detail: String?,
+        actionContent: AnyView?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title).font(.subheadline).bold()
+                Spacer()
+                statusBadge(status)
+            }
+            if let detail {
+                Text(detail).font(.caption).foregroundColor(.secondary)
+            }
+            if let actionContent {
+                actionContent
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(colorScheme == .dark ? 0.1 : 0.05)))
+    }
+
+    private func statusBadge(_ status: String) -> some View {
+        Text(status.capitalized)
+            .font(.caption2)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill(Color.accentColor.opacity(colorScheme == .dark ? 0.3 : 0.15))
+            )
+    }
+
+    private var titleForSearch: String {
+        switch mode {
+        case .org:
+            return "Invite teammates"
+        case .friends:
+            return "Add friends"
+        case .both:
+            return "Invite teammates or add friends"
+        }
+    }
+
+    private func requestTitle(_ request: FriendRequest) -> String {
+        request.requesterId == request.targetUserId ? request.requesterId : request.requesterId
+    }
+
+    private func refreshAll() async {
+        await MainActor.run { isLoading = true }
+        defer {
+            Task {
+                await MainActor.run { isLoading = false }
+            }
+        }
+        await loadInvitations()
+        await loadFriends()
+        await loadOrganizations()
+    }
+
+    private func loadInvitations() async {
+        guard supportsOrg else {
+            await MainActor.run {
+                receivedInvites = []
+                sentInvites = []
+            }
+            return
+        }
+        do {
+            async let received = ea.invitationsReceived(cursor: nil, limit: 20)
+            async let sent = ea.invitationsSent(cursor: nil, limit: 20)
+            let (receivedResult, sentResult) = try await (received, sent)
+            await MainActor.run {
+                receivedInvites = receivedResult.items
+                inviteReceivedHasMore = receivedResult.hasMore
+                inviteReceivedCursor = receivedResult.nextCursor
+                sentInvites = sentResult.items
+                inviteSentHasMore = sentResult.hasMore
+                inviteSentCursor = sentResult.nextCursor
+            }
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func loadFriends() async {
+        guard supportsFriends else {
+            await MainActor.run {
+                friendReceived = []
+                friendSent = []
+            }
+            return
+        }
+        do {
+            async let received = ea.friendRequestsReceived(cursor: nil, limit: 20)
+            async let sent = ea.friendRequestsSent(cursor: nil, limit: 20)
+            let (receivedResult, sentResult) = try await (received, sent)
+            await MainActor.run {
+                friendReceived = receivedResult.items
+                friendReceivedHasMore = receivedResult.hasMore
+                friendReceivedCursor = receivedResult.nextCursor
+                friendSent = sentResult.items
+                friendSentHasMore = sentResult.hasMore
+                friendSentCursor = sentResult.nextCursor
+            }
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func loadOrganizations() async {
+        guard supportsOrg else { return }
+        do {
+            let orgs = try await ea.organizations()
+            await MainActor.run {
+                orgOptions = orgs.filter { $0.role == "owner" || $0.role == "admin" }
+                selectedOrgId = orgOptions.first?.orgId
+            }
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func loadMoreInvitations(kind: InvitationKind) async {
+        guard supportsOrg else { return }
+        do {
+            switch kind {
+            case .received:
+                guard let cursor = inviteReceivedCursor else { return }
+                let result = try await ea.invitationsReceived(cursor: cursor, limit: 20)
+                await MainActor.run {
+                    if receivedInvites == nil {
+                        receivedInvites = result.items
+                    } else {
+                        receivedInvites?.append(contentsOf: result.items)
+                    }
+                    inviteReceivedCursor = result.nextCursor
+                    inviteReceivedHasMore = result.hasMore
+                }
+            case .sent:
+                guard let cursor = inviteSentCursor else { return }
+                let result = try await ea.invitationsSent(cursor: cursor, limit: 20)
+                await MainActor.run {
+                    if sentInvites == nil {
+                        sentInvites = result.items
+                    } else {
+                        sentInvites?.append(contentsOf: result.items)
+                    }
+                    inviteSentCursor = result.nextCursor
+                    inviteSentHasMore = result.hasMore
+                }
+            }
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func loadMoreFriends(kind: InvitationKind) async {
+        guard supportsFriends else { return }
+        do {
+            switch kind {
+            case .received:
+                guard let cursor = friendReceivedCursor else { return }
+                let result = try await ea.friendRequestsReceived(cursor: cursor, limit: 20)
+                await MainActor.run {
+                    if friendReceived == nil {
+                        friendReceived = result.items
+                    } else {
+                        friendReceived?.append(contentsOf: result.items)
+                    }
+                    friendReceivedCursor = result.nextCursor
+                    friendReceivedHasMore = result.hasMore
+                }
+            case .sent:
+                guard let cursor = friendSentCursor else { return }
+                let result = try await ea.friendRequestsSent(cursor: cursor, limit: 20)
+                await MainActor.run {
+                    if friendSent == nil {
+                        friendSent = result.items
+                    } else {
+                        friendSent?.append(contentsOf: result.items)
+                    }
+                    friendSentCursor = result.nextCursor
+                    friendSentHasMore = result.hasMore
+                }
+            }
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func performSearch() async {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else { return }
+        await MainActor.run {
+            isSearching = true
+            errorMessage = nil
+        }
+        do {
+            let results = try await ea.inviteSearchUsers(q: query)
+            await MainActor.run {
+                isSearching = false
+                searchResults = results.map { PersonResult(id: $0.id, username: $0.username, email: $0.email) }
+            }
+        } catch {
+            await MainActor.run {
+                isSearching = false
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func invite(_ userId: String, orgId: String) async {
+        do {
+            _ = try await ea.inviteStart(orgId: orgId, inviteeUserId: userId, role: "member")
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func startFriendRequest(_ userId: String) async {
+        do {
+            try await ea.friendStart(targetUserId: userId)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func acceptInvitation(_ id: String) async {
+        do {
+            try await ea.inviteAcceptById(invitationId: id)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func declineInvitation(_ id: String) async {
+        do {
+            try await ea.inviteDecline(invitationId: id)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func revokeInvitation(_ id: String) async {
+        do {
+            try await ea.inviteRevoke(invitationId: id)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func resendInvitation(_ id: String) async {
+        do {
+            _ = try await ea.inviteResend(invitationId: id)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func acceptFriend(_ id: String) async {
+        do {
+            try await ea.friendAccept(requestId: id)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func declineFriend(_ id: String) async {
+        do {
+            try await ea.friendDecline(requestId: id)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func cancelFriend(_ id: String) async {
+        do {
+            try await ea.friendCancel(requestId: id)
+            await refreshAll()
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private enum InvitationKind {
+        case received
+        case sent
+    }
+
+    private struct PersonResult: Identifiable {
+        let id: String
+        let username: String?
+        let email: String?
+
+        var displayName: String {
+            username ?? email ?? id
+        }
+    }
+}
+import SwiftUI
+import EntityAuthDomain
+
 // MARK: - Invitations Content (New System)
 struct InvitationsContent: View {
     @Environment(\.entityAuthProvider) private var ea

@@ -39,6 +39,7 @@ public actor EntityAuthFacade {
         public var organizationService: OrganizationsProviding
         public var entitiesService: EntitiesProviding
         public var invitationService: InvitationsProviding
+        public var friendService: FriendsProviding
         public var refreshHandler: TokenRefresher
         public var apiClient: any APIClientType
         public var realtime: RealtimeSubscriptionHandling
@@ -50,6 +51,7 @@ public actor EntityAuthFacade {
             organizationService: OrganizationsProviding,
             entitiesService: EntitiesProviding,
             invitationService: InvitationsProviding,
+            friendService: FriendsProviding,
             refreshHandler: TokenRefresher,
             apiClient: any APIClientType,
             realtime: RealtimeSubscriptionHandling
@@ -61,6 +63,7 @@ public actor EntityAuthFacade {
             self.organizationService = organizationService
             self.entitiesService = entitiesService
             self.invitationService = invitationService
+            self.friendService = friendService
             self.refreshHandler = refreshHandler
             self.apiClient = apiClient
             self.realtime = realtime
@@ -88,6 +91,7 @@ public actor EntityAuthFacade {
             let organizationService = OrganizationService(client: client)
             let entitiesService = EntitiesService(client: client)
             let invitationService = InvitationService(client: client)
+            let friendService = FriendService(client: client)
             let realtime = RealtimeCoordinator(baseURL: finalConfig.baseURL) { baseURL in
                 let request = APIRequest(method: .get, path: "/api/convex", requiresAuthentication: false)
                 let data = try await client.send(request)
@@ -103,6 +107,7 @@ public actor EntityAuthFacade {
                 organizationService: organizationService,
                 entitiesService: entitiesService,
                 invitationService: invitationService,
+                friendService: friendService,
                 refreshHandler: refresher,
                 apiClient: client,
                 realtime: realtime
@@ -725,6 +730,39 @@ public actor EntityAuthFacade {
             throw EntityAuthError.unauthorized
         }
         let response = try await dependencies.invitationService.listReceived(userId: userId, cursor: cursor, limit: limit)
+        return (response.items, response.hasMore, response.nextCursor)
+    }
+    
+    // MARK: - Friends (Personal connections)
+    public func startFriendRequest(targetUserId: String) async throws {
+        try await dependencies.friendService.start(targetUserId: targetUserId)
+    }
+    
+    public func acceptFriendRequest(requestId: String) async throws {
+        try await dependencies.friendService.accept(requestId: requestId)
+    }
+    
+    public func declineFriendRequest(requestId: String) async throws {
+        try await dependencies.friendService.decline(requestId: requestId)
+    }
+    
+    public func cancelFriendRequest(requestId: String) async throws {
+        try await dependencies.friendService.cancel(requestId: requestId)
+    }
+    
+    public func listFriendRequestsSent(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) {
+        guard let userId = snapshot.userId else {
+            throw EntityAuthError.unauthorized
+        }
+        let response = try await dependencies.friendService.listSent(requesterId: userId, cursor: cursor, limit: limit)
+        return (response.items, response.hasMore, response.nextCursor)
+    }
+    
+    public func listFriendRequestsReceived(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) {
+        guard let userId = snapshot.userId else {
+            throw EntityAuthError.unauthorized
+        }
+        let response = try await dependencies.friendService.listReceived(targetUserId: userId, cursor: cursor, limit: limit)
         return (response.items, response.hasMore, response.nextCursor)
     }
 
