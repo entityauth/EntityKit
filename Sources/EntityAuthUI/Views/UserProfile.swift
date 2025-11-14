@@ -192,10 +192,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
             sections.insert(.organizations, at: 1)
         }
 
-        // Insert the multi-account switcher near account / organizations sections
-        // so it appears alongside core account management UIs.
-        let accountsIndex = (modeIndicator != .personal) ? 2 : 1
-        sections.insert(.accounts, at: accountsIndex)
+        // Note: .accounts is NOT added to the menu sections - it appears only in the footer
+        // (just before Sign out), matching the web version behavior.
 
         if flags.showPreferences {
             sections.append(.preferences)
