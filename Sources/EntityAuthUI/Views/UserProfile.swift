@@ -274,6 +274,9 @@ private struct UserProfileSheet: View {
                         }
                     }
                     
+                    // Switch Account Button (iOS - appears before Sign out, matching macOS behavior)
+                    switchAccountRow
+                    
                     // Sign Out Button
                     signOutRow
                 }
@@ -716,6 +719,63 @@ private struct UserProfileSheet: View {
                     .frame(width: 20, height: 20)
                     
                     Text(section.title)
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Chevron
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                Group {
+                    #if os(iOS)
+                    if #available(iOS 26.0, *) {
+                        Capsule()
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    }
+                    #elseif os(macOS)
+                    if #available(macOS 15.0, *) {
+                        Capsule()
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    }
+                    #else
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                    #endif
+                }
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var switchAccountRow: some View {
+        Button(action: { path.append(.accounts) }) {
+            HStack(spacing: 16) {
+                // Section Info
+                HStack(spacing: 12) {
+                    Image("AtSign", bundle: .module)
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                    
+                    Text("Switch account")
                         .font(.system(.body, design: .rounded, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
