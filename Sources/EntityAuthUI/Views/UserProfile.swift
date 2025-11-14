@@ -143,6 +143,7 @@ private enum ProfileSection: String, CaseIterable, Hashable {
     case preferences
     case security
     case deleteAccount
+    case accounts
     case docs
     case changelog
 
@@ -154,6 +155,7 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         case .preferences: return "Preferences"
         case .security: return "Security"
         case .deleteAccount: return "Delete Account"
+        case .accounts: return "Switch account"
         case .docs: return "Documentation"
         case .changelog: return "Changelog"
         }
@@ -167,6 +169,7 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         case .preferences: return "Settings"
         case .security: return "Lock"
         case .deleteAccount: return "DeleteX"
+        case .accounts: return "AtSign"
         case .docs: return "system:doc.text" // Documentation icon (system icon)
         case .changelog: return "system:clock.arrow.circlepath" // Changelog icon (system icon)
         }
@@ -183,12 +186,17 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         modeIndicator: UserProfileModeIndicator?
     ) -> [ProfileSection] {
         var sections: [ProfileSection] = [.account, .invitations]
-        
+
         // Only show Organizations when we are not explicitly in personal mode.
         if modeIndicator != .personal {
             sections.insert(.organizations, at: 1)
         }
-        
+
+        // Insert the multi-account switcher near account / organizations sections
+        // so it appears alongside core account management UIs.
+        let accountsIndex = (modeIndicator != .personal) ? 2 : 1
+        sections.insert(.accounts, at: accountsIndex)
+
         if flags.showPreferences {
             sections.append(.preferences)
         }
@@ -425,6 +433,26 @@ private struct UserProfileSheet: View {
             
             Spacer()
             
+            // Account Switcher Button (above Sign out)
+            Button(action: {
+                selected = .accounts
+            }) {
+                HStack(spacing: 10) {
+                    Image("AtSign", bundle: .module)
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 16, height: 16)
+                    Text("Switch account")
+                        .font(.system(.subheadline, design: .rounded, weight: .medium))
+                    Spacer()
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            
             // Sign Out Button (at bottom, inside container)
             Button(action: {
                 Task {
@@ -512,6 +540,9 @@ private struct UserProfileSheet: View {
                 securityDetailView
             case .deleteAccount:
                 deleteAccountDetailView
+            case .accounts:
+                AccountSwitcherView()
+                    .frame(maxWidth: .infinity, alignment: .leading)
             case .docs:
                 docsDetailView
             case .changelog:
@@ -848,6 +879,11 @@ private struct SectionDetail: View {
                     
                 case .deleteAccount:
                     DeleteAccountContent()
+                    
+                case .accounts:
+                    AccountSwitcherView()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(24)
                     
                 case .docs:
                     #if canImport(EntityDocsSwift)

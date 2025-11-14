@@ -446,6 +446,25 @@ public extension View {
     }
 }
 
+// MARK: - Account Manager Environment
+
+private struct AccountManagerKey: EnvironmentKey {
+    static let defaultValue: (any AccountManaging)? = nil
+}
+
+public extension EnvironmentValues {
+    var accountManager: (any AccountManaging)? {
+        get { self[AccountManagerKey.self] }
+        set { self[AccountManagerKey.self] = newValue }
+    }
+}
+
+public extension View {
+    func entityAccountManager(_ manager: some AccountManaging) -> some View {
+        environment(\.accountManager, manager)
+    }
+}
+
 
 // MARK: - Profile Image Upload Adapter
 
