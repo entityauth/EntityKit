@@ -50,6 +50,7 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _friendCancel: @Sendable (_ requestId: String) async throws -> Void
     private let _friendsReceived: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
     private let _friendsSent: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
+    private let _deleteAccount: @Sendable () async throws -> Void
 
     public init(
         stream: @escaping @Sendable () async -> AsyncStream<Snapshot>,
@@ -92,7 +93,8 @@ public struct AnyEntityAuthProvider: Sendable {
         friendDecline: @escaping @Sendable (_ requestId: String) async throws -> Void,
         friendCancel: @escaping @Sendable (_ requestId: String) async throws -> Void,
         friendsReceived: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?),
-        friendsSent: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
+        friendsSent: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?),
+        deleteAccount: @escaping @Sendable () async throws -> Void
     ) {
         self._stream = stream
         self._current = current
@@ -135,6 +137,7 @@ public struct AnyEntityAuthProvider: Sendable {
         self._friendCancel = friendCancel
         self._friendsReceived = friendsReceived
         self._friendsSent = friendsSent
+        self._deleteAccount = deleteAccount
     }
 
     public func snapshotStream() async -> AsyncStream<Snapshot> { await _stream() }
@@ -178,13 +181,15 @@ public struct AnyEntityAuthProvider: Sendable {
     public func friendCancel(requestId: String) async throws { try await _friendCancel(requestId) }
     public func friendRequestsReceived(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) { try await _friendsReceived(cursor, limit) }
     public func friendRequestsSent(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) { try await _friendsSent(cursor, limit) }
+    public func deleteAccount() async throws { try await _deleteAccount() }
 }
 
 public extension AnyEntityAuthProvider {
     static func live(
         facade: EntityAuthFacade,
         config: EntityAuthConfig,
-        onSwitchOrg: (@Sendable (_ orgId: String) async throws -> Void)? = nil
+        onSwitchOrg: (@Sendable (_ orgId: String) async throws -> Void)? = nil,
+        deleteAccount: (@Sendable () async throws -> Void)? = nil
     ) -> AnyEntityAuthProvider {
         return AnyEntityAuthProvider(
             stream: { await facade.snapshotStream() },
@@ -243,7 +248,14 @@ public extension AnyEntityAuthProvider {
             friendDecline: { requestId in try await facade.declineFriendRequest(requestId: requestId) },
             friendCancel: { requestId in try await facade.cancelFriendRequest(requestId: requestId) },
             friendsReceived: { cursor, limit in try await facade.listFriendRequestsReceived(cursor: cursor, limit: limit) },
-            friendsSent: { cursor, limit in try await facade.listFriendRequestsSent(cursor: cursor, limit: limit) }
+            friendsSent: { cursor, limit in try await facade.listFriendRequestsSent(cursor: cursor, limit: limit) },
+            deleteAccount: {
+                if let customDelete = deleteAccount {
+                    try await customDelete()
+                } else {
+                    try await facade.deleteAccount()
+                }
+            }
         )
     }
 
@@ -321,7 +333,8 @@ public extension AnyEntityAuthProvider {
             friendDecline: { _ in },
             friendCancel: { _ in },
             friendsReceived: { _, _ in ([], false, nil) },
-            friendsSent: { _, _ in ([], false, nil) }
+            friendsSent: { _, _ in ([], false, nil) },
+            deleteAccount: { }
         )
     }
 
@@ -410,7 +423,8 @@ public extension AnyEntityAuthProvider {
             friendDecline: { _ in },
             friendCancel: { _ in },
             friendsReceived: { _, _ in ([], false, nil) },
-            friendsSent: { _, _ in ([], false, nil) }
+            friendsSent: { _, _ in ([], false, nil) },
+            deleteAccount: { }
         )
     }
 }

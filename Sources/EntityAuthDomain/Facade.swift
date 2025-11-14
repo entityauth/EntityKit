@@ -315,6 +315,28 @@ public actor EntityAuthFacade {
         lastUserStore.clear()
     }
 
+    /// Delete the current user's account.
+    /// This will permanently delete the user's Entity Auth account and clear local auth state.
+    public func deleteAccount() async throws {
+        let request = APIRequest(method: .post, path: "/api/user/delete-account", requiresAuthentication: true)
+        
+        do {
+            let _ = try await dependencies.apiClient.send(request)
+            // On success, clear auth state (idempotent behavior)
+            await clearAuthStateAndEmit(reason: "user requested account deletion")
+        } catch let error as EntityAuthError {
+            // If server responds with 401/404 (user not found, already deleted), treat as success (idempotent)
+            if case let EntityAuthError.network(status, _) = error {
+                if status == 401 || status == 404 {
+                    await clearAuthStateAndEmit(reason: "user requested account deletion (already deleted)")
+                    return
+                }
+            }
+            // Re-throw other errors
+            throw error
+        }
+    }
+
     /// Hard reset local auth state without contacting the server.
     /// Useful in development to clear Keychain tokens and local snapshot if state becomes inconsistent.
     public func hardResetLocalAuth() async {

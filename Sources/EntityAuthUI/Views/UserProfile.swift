@@ -13,20 +13,17 @@ import AppKit
 public struct UserProfileFeatureFlags: Sendable {
     public let showPreferences: Bool
     public let showSecurity: Bool
-    public let showDeleteAccount: Bool
     public let showDocs: Bool
     public let docsAppName: String? // e.g., "past", "entity-auth"
     
     public init(
         showPreferences: Bool = true,
         showSecurity: Bool = false,
-        showDeleteAccount: Bool = false,
         showDocs: Bool = false,
         docsAppName: String? = nil
     ) {
         self.showPreferences = showPreferences
         self.showSecurity = showSecurity
-        self.showDeleteAccount = showDeleteAccount
         self.showDocs = showDocs
         self.docsAppName = docsAppName
     }
@@ -37,8 +34,7 @@ public struct UserProfileFeatureFlags: Sendable {
     /// All sections enabled for development
     public static let development = UserProfileFeatureFlags(
         showPreferences: true,
-        showSecurity: true,
-        showDeleteAccount: true
+        showSecurity: true
     )
 }
 
@@ -199,9 +195,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         if flags.showSecurity {
             sections.append(.security)
         }
-        if flags.showDeleteAccount {
-            sections.append(.deleteAccount)
-        }
+        // Delete account is always visible (no feature flag)
+        sections.append(.deleteAccount)
         if flags.showDocs && flags.docsAppName != nil {
             sections.append(.docs)
             sections.append(.changelog)

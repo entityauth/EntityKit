@@ -244,7 +244,6 @@ public struct UserProfileGallery: View {
                             featureFlags: UserProfileFeatureFlags(
                                 showPreferences: true,
                                 showSecurity: true,
-                                showDeleteAccount: true,
                                 showDocs: true,
                                 docsAppName: "entity-auth"
                             )
