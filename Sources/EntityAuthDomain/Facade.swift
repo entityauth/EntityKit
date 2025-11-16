@@ -228,6 +228,14 @@ public actor EntityAuthFacade {
         snapshot
     }
     
+    /// Returns true if there are any stored tokens in the underlying auth state.
+    /// This lets host apps distinguish between "cold start with no session"
+    /// and "existing session still hydrating" without guessing based on snapshots.
+    public func hasStoredTokens() async -> Bool {
+        let currentTokens = await dependencies.authState.currentTokens
+        return currentTokens.accessToken != nil || currentTokens.refreshToken != nil
+    }
+    
     // MARK: - Emission control
     private func emit() {
         if emitSuppressionCount == 0 {
