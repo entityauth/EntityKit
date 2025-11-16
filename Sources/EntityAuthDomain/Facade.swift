@@ -926,6 +926,7 @@ public actor EntityAuthFacade {
     }
 
     private func refreshUserData(userId: String? = nil) async throws {
+        let start = Date()
         print("[EntityAuth][refreshUserData] BEGIN")
         
         // Use bootstrap endpoint for optimal performance (single roundtrip)
@@ -1003,7 +1004,8 @@ public actor EntityAuthFacade {
             return
         }
         
-        print("[EntityAuth][refreshUserData] END orgs=\(snapshot.organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil")")
+        let elapsed = Date().timeIntervalSince(start)
+        print("[EntityAuth][refreshUserData] END orgs=\(snapshot.organizations.count) active=\(snapshot.activeOrganization?.orgId ?? "nil") elapsed=\(String(format: "%.3f", elapsed))s")
         emit()
     }
     
@@ -1261,6 +1263,7 @@ extension EntityAuthFacade {
     }
     
     private func initializeAsync() async {
+        let start = Date()
         print("[EntityAuth][initializeAsync] BEGIN")
         await dependencies.refreshHandler.replaceRefreshService(with: dependencies.authService)
         setupRealtimeSubscriptions()
@@ -1272,6 +1275,14 @@ extension EntityAuthFacade {
         }
         // Eagerly hydrate userId on cold start if tokens are present
         let currentTokens = await dependencies.authState.currentTokens
+        // Ensure snapshot has the latest cached tokens so helpers like
+        // currentActiveOrgIdFromAccessToken() can see the oid/claims.
+        if snapshot.accessToken == nil {
+            snapshot.accessToken = currentTokens.accessToken
+        }
+        if snapshot.refreshToken == nil {
+            snapshot.refreshToken = currentTokens.refreshToken
+        }
         if currentTokens.accessToken != nil || currentTokens.refreshToken != nil {
             print("[EntityAuth][initializeAsync] Tokens present - starting optimized hydration sequence")
             do {
@@ -1309,9 +1320,12 @@ extension EntityAuthFacade {
                     
                     // Step 2: Use bootstrap endpoint to fetch identity + orgs in single call
                     print("[EntityAuth][initializeAsync] Step 2: Fetching user data via bootstrap endpoint...")
+                    let step2Start = Date()
                     do {
                         try await refreshUserData()
                         print("[EntityAuth][initializeAsync] Step 2: Bootstrap SUCCESS - userId=\(snapshot.userId ?? "nil") orgs=\(snapshot.organizations.count)")
+                        let step2Elapsed = Date().timeIntervalSince(step2Start)
+                        print("[EntityAuth][initializeAsync][perf] Step 2 (bootstrap) elapsed=\(String(format: "%.3f", step2Elapsed))s")
                     } catch {
                         print("[EntityAuth][initializeAsync] Step 2 ERROR: \(error)")
                         print("[EntityAuth][initializeAsync] Error type: \(type(of: error))")
@@ -1366,12 +1380,17 @@ extension EntityAuthFacade {
                         print("[EntityAuth][initializeAsync] Step 3: Skipping org creation (hasOrgs=\(hasExistingOrgs) tokenOid=\(tokenOid ?? "nil"))")
                     }
                     
-                    // Step 4: If still no active org but memberships exist, switch to first org
+                    // Step 4: If still no active org but memberships exist, switch to first org.
+                    // IMPORTANT: only do this when snapshot.activeOrganization is nil; if bootstrap
+                    // has already set an active org, we should *not* issue an extra switchOrg+bootstrap.
                     print("[EntityAuth][initializeAsync] Step 4: Checking if need to switch to first org...")
                     let tokenOidBeforeSwitch = currentActiveOrgIdFromAccessToken()
-                    if tokenOidBeforeSwitch == nil, let firstOrg = snapshot.organizations.first?.orgId {
+                    if tokenOidBeforeSwitch == nil,
+                       snapshot.activeOrganization == nil,
+                       let firstOrg = snapshot.organizations.first?.orgId {
                         print("[EntityAuth][initializeAsync] Step 4: Token has no oid, switching to first org: \(firstOrg)")
                         do {
+                            let switchStart = Date()
                             let newToken = try await dependencies.organizationService.switchOrg(orgId: firstOrg)
                             try await dependencies.authState.update(accessToken: newToken)
                             snapshot.accessToken = newToken
@@ -1379,6 +1398,8 @@ extension EntityAuthFacade {
                             // Refresh after switch (will use bootstrap)
                             try await refreshUserData(userId: snapshot.userId)
                             print("[EntityAuth][initializeAsync] Step 4: refreshUserData() after switch SUCCESS")
+                            let switchElapsed = Date().timeIntervalSince(switchStart)
+                            print("[EntityAuth][initializeAsync][perf] Step 4 (switchOrg + bootstrap) elapsed=\(String(format: "%.3f", switchElapsed))s")
                         } catch {
                             print("[EntityAuth][initializeAsync] Step 4 ERROR: switchOrg/refreshUserData FAILED: \(error)")
                         }
@@ -1416,7 +1437,8 @@ extension EntityAuthFacade {
         } else {
             print("[EntityAuth][initializeAsync] No tokens present - skipping hydration")
         }
-        print("[EntityAuth][initializeAsync] END")
+        let totalElapsed = Date().timeIntervalSince(start)
+        print("[EntityAuth][initializeAsync] END totalElapsed=\(String(format: "%.3f", totalElapsed))s")
     }
     private func setupRealtimeSubscriptions() {
         realtimeCancellable = dependencies.realtime.publisher().sink { [weak self] event in
