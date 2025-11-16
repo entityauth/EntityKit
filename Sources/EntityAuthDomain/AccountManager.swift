@@ -344,7 +344,7 @@ public actor AccountManager: AccountManaging {
     
     public func syncFromCloud() async throws {
         let snapshot = await facade.currentSnapshot()
-        guard let userId = snapshot.userId,
+        guard snapshot.userId != nil,
               let workspaceTenantId = apiClient.workspaceTenantId else {
             print("[AccountManager] syncFromCloud() abort (no userId or workspaceTenantId)")
             return
@@ -417,8 +417,8 @@ public actor AccountManager: AccountManaging {
     
     public func pushToCloud() async throws {
         let snapshot = await facade.currentSnapshot()
-        guard let userId = snapshot.userId,
-              let workspaceTenantId = apiClient.workspaceTenantId else {
+        guard snapshot.userId != nil,
+              apiClient.workspaceTenantId != nil else {
             print("[AccountManager] pushToCloud() abort (no userId or workspaceTenantId)")
             return
         }
@@ -432,7 +432,7 @@ public actor AccountManager: AccountManaging {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
               (200..<300).contains(httpResponse.statusCode) else {
             print("[AccountManager] pushToCloud() failed: HTTP \(response)")

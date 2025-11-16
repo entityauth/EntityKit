@@ -119,7 +119,7 @@ public struct OrganizationMembersList: View {
     private func remove(userId: String) async {
         do {
             try await ea.removeMember(orgId: orgId, userId: userId)
-            try? await refresh()
+            await refresh()
         } catch {
             self.error = error.localizedDescription
         }

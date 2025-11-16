@@ -71,7 +71,7 @@ struct PeopleContent: View {
                 }
                 Spacer()
                 if let errorMessage {
-                    Text(errorMessage ?? "")
+                    Text(errorMessage)
                         .font(.caption)
                         .foregroundColor(.red)
                 }

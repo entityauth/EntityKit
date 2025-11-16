@@ -56,10 +56,10 @@ public struct DocsView: View {
         .onAppear {
             loadPages()
         }
-        .onChange(of: appName) { _ in
+        .onChange(of: appName) { _, _ in
             loadPages()
         }
-        .onChange(of: isChangelog) { _ in
+        .onChange(of: isChangelog) { _, _ in
             loadPages()
         }
     }

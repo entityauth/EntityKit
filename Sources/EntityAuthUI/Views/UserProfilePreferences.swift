@@ -30,21 +30,26 @@ private struct PreferencesContent: View {
                         print("[EntityKit][Preferences] Loading… isLoading=\(prefs.isLoading) valueIsNil=\(prefs.value == nil) hasOnChange=\(prefs.onChange != nil) hasOnSave=\(prefs.onSave != nil)")
                     }
             } else if let value = prefs.value {
+                let onChange = prefs.onChange
                 preferenceRow(title: "Chat", subtitle: "Conversations and messaging", isOn: value.chat) { newVal in
                     print("[EntityKit][Preferences] Toggle chat -> \(newVal)")
-                    var v = value; v.chat = newVal; prefs.onChange?(v)
+                    var v = value; v.chat = newVal
+                    Task { @MainActor in onChange?(v) }
                 }
                 preferenceRow(title: "Notes", subtitle: "Create and organize notes", isOn: value.notes) { newVal in
                     print("[EntityKit][Preferences] Toggle notes -> \(newVal)")
-                    var v = value; v.notes = newVal; prefs.onChange?(v)
+                    var v = value; v.notes = newVal
+                    Task { @MainActor in onChange?(v) }
                 }
                 preferenceRow(title: "Tasks", subtitle: "Task management and tracking", isOn: value.tasks) { newVal in
                     print("[EntityKit][Preferences] Toggle tasks -> \(newVal)")
-                    var v = value; v.tasks = newVal; prefs.onChange?(v)
+                    var v = value; v.tasks = newVal
+                    Task { @MainActor in onChange?(v) }
                 }
                 preferenceRow(title: "Feed", subtitle: "Activity feed and updates", isOn: value.feed) { newVal in
                     print("[EntityKit][Preferences] Toggle feed -> \(newVal)")
-                    var v = value; v.feed = newVal; prefs.onChange?(v)
+                    var v = value; v.feed = newVal
+                    Task { @MainActor in onChange?(v) }
                 }
 
                 Divider().padding(.vertical, 6)
@@ -53,7 +58,8 @@ private struct PreferencesContent: View {
                     .font(.system(.headline, design: .rounded, weight: .semibold))
                 preferenceRow(title: "Global \"All\" View", subtitle: "Aggregate content across workspaces and personal space", isOn: value.globalViewEnabled) { newVal in
                     print("[EntityKit][Preferences] Toggle globalViewEnabled -> \(newVal)")
-                    var v = value; v.globalViewEnabled = newVal; prefs.onChange?(v)
+                    var v = value; v.globalViewEnabled = newVal
+                    Task { @MainActor in onChange?(v) }
                 }
 
                 HStack {
@@ -75,7 +81,7 @@ private struct PreferencesContent: View {
     }
 
     @ViewBuilder
-    private func preferenceRow(title: String, subtitle: String, isOn: Bool, onToggle: @escaping (Bool) -> Void) -> some View {
+    private func preferenceRow(title: String, subtitle: String, isOn: Bool, onToggle: @escaping @Sendable (Bool) -> Void) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(.body, design: .rounded, weight: .semibold))

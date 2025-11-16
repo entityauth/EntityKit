@@ -49,9 +49,9 @@ public struct AuthGate: View {
         let base = provider.baseURL()
         let sso = EntityAuthSSO(baseURL: base)
         #if os(iOS)
-        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth-demo://sso")!
+        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth://sso")!
         #else
-        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth-demo-mac://sso")!
+        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth://sso")!
         #endif
         
         do {

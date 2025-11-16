@@ -29,9 +29,14 @@ internal struct CustomTabPicker: View {
             .buttonStyle(.plain)
             .background {
                 if selection == .signIn {
-                    Capsule()
-                        .fill(.regularMaterial)
-                        .glassEffect(.regular.interactive(true), in: .capsule)
+                    if #available(iOS 26, *) {
+                        Capsule()
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(.regularMaterial)
+                    }
                 }
             }
             
@@ -50,9 +55,14 @@ internal struct CustomTabPicker: View {
             .buttonStyle(.plain)
             .background {
                 if selection == .register {
-                    Capsule()
-                        .fill(.regularMaterial)
-                        .glassEffect(.regular.interactive(true), in: .capsule)
+                    if #available(iOS 26, *) {
+                        Capsule()
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
+                            .fill(.regularMaterial)
+                    }
                 }
             }
         }

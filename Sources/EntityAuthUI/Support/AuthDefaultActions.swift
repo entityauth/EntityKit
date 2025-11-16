@@ -39,9 +39,9 @@ private extension AuthDefaultActions {
         let base = provider.baseURL()
         let sso = await MainActor.run { EntityAuthSSO(baseURL: base) }
         #if os(iOS)
-        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth-demo://sso")!
+        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth://sso")!
         #else
-        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth-demo-mac://sso")!
+        let callback = provider.ssoCallbackURL() ?? URL(string: "entityauth://sso")!
         #endif
         do {
             let result = try await sso.signIn(provider: providerName, returnTo: callback, workspaceTenantId: tenant)
