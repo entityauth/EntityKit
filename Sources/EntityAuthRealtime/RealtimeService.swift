@@ -77,13 +77,13 @@ public protocol RealtimeSubscriptionHandling: Sendable {
 }
 
 public protocol ConvexSubscribing {
-    func subscribe<T: Decodable>(to: String, with: [String: Any], yielding: T.Type) -> AnyPublisher<T, Error>
+    func subscribe<T: Decodable & Sendable>(to: String, with: [String: Any], yielding: T.Type) -> AnyPublisher<T, Error>
 }
 
 public struct ConvexClientAdapter: ConvexSubscribing {
     public let client: ConvexClient
     public init(client: ConvexClient) { self.client = client }
-    public func subscribe<T: Decodable>(to: String, with: [String: Any], yielding: T.Type) -> AnyPublisher<T, Error> {
+    public func subscribe<T: Decodable & Sendable>(to: String, with: [String: Any], yielding: T.Type) -> AnyPublisher<T, Error> {
         let params: [String: (any ConvexEncodable)?] = with.mapValues { value in
             value as? (any ConvexEncodable)
         }
@@ -218,14 +218,14 @@ public final class RealtimeCoordinator: RealtimeSubscriptionHandling, @unchecked
     }
 }
 
-struct UserRecord: Decodable {
-    struct Properties: Decodable { let username: String? }
+struct UserRecord: Decodable, Sendable {
+    struct Properties: Decodable, Sendable { let username: String? }
     let properties: Properties?
 }
 
-struct OrganizationRecord: Decodable {
-    struct Organization: Decodable {
-        struct Properties: Decodable {
+struct OrganizationRecord: Decodable, Sendable {
+    struct Organization: Decodable, Sendable {
+        struct Properties: Decodable, Sendable {
             let name: String?
             let slug: String?
             let memberCount: Int?
@@ -240,7 +240,7 @@ struct OrganizationRecord: Decodable {
     let joinedAt: Double?
 }
 
-struct SessionRecord: Decodable {
+struct SessionRecord: Decodable, Sendable {
     let status: String?
 }
  

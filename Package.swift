@@ -13,7 +13,8 @@ let package = Package(
         .library(name: "EntityDocsSwift", targets: ["EntityDocsSwift"])
     ],
     dependencies: [
-        .package(url: "https://github.com/entityauth/convex-swift.git", from: "0.1.0"),
+        // Use the local convex-swift fork to avoid conflicting package identities with the Past app.
+        .package(path: "../Convex-Forks/convex-swift"),
         .package(url: "https://github.com/apple/swift-markdown.git", from: "0.3.0")
     ],
     targets: [

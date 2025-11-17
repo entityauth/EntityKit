@@ -50,6 +50,8 @@ public struct AnyEntityAuthProvider: Sendable {
     private let _friendCancel: @Sendable (_ requestId: String) async throws -> Void
     private let _friendsReceived: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
     private let _friendsSent: @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?)
+    private let _friendConnections: @Sendable () async throws -> [FriendConnection]
+    private let _removeFriendConnection: @Sendable (_ friendId: String) async throws -> Void
     private let _deleteAccount: @Sendable () async throws -> Void
 
     public init(
@@ -94,6 +96,8 @@ public struct AnyEntityAuthProvider: Sendable {
         friendCancel: @escaping @Sendable (_ requestId: String) async throws -> Void,
         friendsReceived: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?),
         friendsSent: @escaping @Sendable (_ cursor: String?, _ limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?),
+        friendConnections: @escaping @Sendable () async throws -> [FriendConnection],
+        removeFriendConnection: @escaping @Sendable (_ friendId: String) async throws -> Void,
         deleteAccount: @escaping @Sendable () async throws -> Void
     ) {
         self._stream = stream
@@ -137,6 +141,8 @@ public struct AnyEntityAuthProvider: Sendable {
         self._friendCancel = friendCancel
         self._friendsReceived = friendsReceived
         self._friendsSent = friendsSent
+        self._friendConnections = friendConnections
+        self._removeFriendConnection = removeFriendConnection
         self._deleteAccount = deleteAccount
     }
 
@@ -181,6 +187,8 @@ public struct AnyEntityAuthProvider: Sendable {
     public func friendCancel(requestId: String) async throws { try await _friendCancel(requestId) }
     public func friendRequestsReceived(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) { try await _friendsReceived(cursor, limit) }
     public func friendRequestsSent(cursor: String?, limit: Int) async throws -> (items: [FriendRequest], hasMore: Bool, nextCursor: String?) { try await _friendsSent(cursor, limit) }
+    public func listFriendConnections() async throws -> [FriendConnection] { try await _friendConnections() }
+    public func removeFriendConnection(friendId: String) async throws { try await _removeFriendConnection(friendId) }
     public func deleteAccount() async throws { try await _deleteAccount() }
 }
 
@@ -249,6 +257,8 @@ public extension AnyEntityAuthProvider {
             friendCancel: { requestId in try await facade.cancelFriendRequest(requestId: requestId) },
             friendsReceived: { cursor, limit in try await facade.listFriendRequestsReceived(cursor: cursor, limit: limit) },
             friendsSent: { cursor, limit in try await facade.listFriendRequestsSent(cursor: cursor, limit: limit) },
+            friendConnections: { try await facade.listFriendConnections() },
+            removeFriendConnection: { friendId in try await facade.removeFriendConnection(friendId: friendId) },
             deleteAccount: {
                 if let customDelete = deleteAccount {
                     try await customDelete()
@@ -334,6 +344,8 @@ public extension AnyEntityAuthProvider {
             friendCancel: { _ in },
             friendsReceived: { _, _ in ([], false, nil) },
             friendsSent: { _, _ in ([], false, nil) },
+            friendConnections: { [] },
+            removeFriendConnection: { _ in },
             deleteAccount: { }
         )
     }
@@ -424,6 +436,8 @@ public extension AnyEntityAuthProvider {
             friendCancel: { _ in },
             friendsReceived: { _, _ in ([], false, nil) },
             friendsSent: { _, _ in ([], false, nil) },
+            friendConnections: { [] },
+            removeFriendConnection: { _ in },
             deleteAccount: { }
         )
     }

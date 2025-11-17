@@ -795,6 +795,32 @@ public actor EntityAuthFacade {
         let response = try await dependencies.friendService.listReceived(targetUserId: userId, cursor: cursor, limit: limit)
         return (response.items, response.hasMore, response.nextCursor)
     }
+    
+    // MARK: - Friend Connections (Confirmed Friendships)
+    
+    public func listFriendConnections() async throws -> [FriendConnection] {
+        let req = APIRequest(method: .get, path: "/api/friends/connections")
+        
+        do {
+            let response = try await dependencies.apiClient.send(req, decode: FriendsConnectionsResponse.self)
+            return response.friends
+        } catch let error as EntityAuthError {
+            throw error
+        }
+    }
+    
+    public func removeFriendConnection(friendId: String) async throws {
+        let queryItems: [URLQueryItem] = [
+            .init(name: "friendId", value: friendId)
+        ]
+        let req = APIRequest(method: .delete, path: "/api/friends/connections", queryItems: queryItems)
+        
+        do {
+            _ = try await dependencies.apiClient.send(req)
+        } catch let error as EntityAuthError {
+            throw error
+        }
+    }
 
     public func addMember(orgId: String, userId: String, role: String) async throws {
         try await dependencies.organizationService.addMember(orgId: orgId, userId: userId, role: role)

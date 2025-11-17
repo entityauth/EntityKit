@@ -200,25 +200,26 @@ public final class InvitationService: InvitationsProviding {
     }
     
     public func searchUsers(q: String) async throws -> [(id: String, email: String?, username: String?)] {
-        guard q.count >= 2 else {
+        // Match backend validation rules:
+        // - Allow single character when it's an email-style query (contains "@")
+        // - Require at least 2 characters for fuzzy username search
+        let trimmed = q.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return []
+        }
+        if trimmed.count == 1 && !trimmed.contains("@") {
             return []
         }
         
-        let body: [String: Any] = ["q": q]
+        let body: [String: Any] = ["q": trimmed]
         let data = try JSONSerialization.data(withJSONObject: body)
         let req = APIRequest(method: .post, path: "/api/users/search", body: data)
-        struct Raw: Decodable {
-            let _id: String?
-            let properties: Props?
-            struct Props: Decodable {
-                let email: String?
-                let username: String?
-            }
-        }
-        let rows = try await client.send(req, decode: [Raw].self)
-        return rows.compactMap { r in
-            guard let id = r._id else { return nil }
-            return (id, r.properties?.email, r.properties?.username)
+        
+        // Backend now returns an envelope `{ users: UserSummary[] }`
+        // which is represented in the domain as `SearchUsersResponse`
+        let response = try await client.send(req, decode: SearchUsersResponse.self)
+        return response.users.map { user in
+            (id: user.id, email: user.email, username: user.username)
         }
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 import EntityAuthDomain
 #if canImport(EntityDocsSwift)
 import EntityDocsSwift
@@ -8,6 +9,14 @@ import UIKit
 #elseif os(macOS)
 import AppKit
 #endif
+
+/// Notification name for opening UserProfile to People section
+extension Notification.Name {
+    public static let openUserProfileToPeople = Notification.Name("openUserProfileToPeople")
+    /// Notification posted when user wants to create a shared resource with a friend
+    /// UserInfo: ["friendId": String, "resourceType": "channel" | "note" | "task" | "feed"]
+    public static let createSharedResourceWithFriend = Notification.Name("createSharedResourceWithFriend")
+}
 
 /// Feature flags for user profile sections
 public struct UserProfileFeatureFlags: Sendable {
@@ -52,6 +61,7 @@ public enum UserProfilePeopleMode: String, Sendable {
 
 public struct UserProfile: View {
     @State private var isPresented = false
+    @State private var peopleInitialTab: PeopleTab? = nil
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
     private let featureFlags: UserProfileFeatureFlags
@@ -78,8 +88,16 @@ public struct UserProfile: View {
                 isPresented: $isPresented,
                 featureFlags: featureFlags,
                 modeIndicator: modeIndicator,
-                peopleMode: peopleMode
+                peopleMode: peopleMode,
+                peopleInitialTab: peopleInitialTab
             )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openUserProfileToPeople)) { notification in
+            // Handle notification to open People section
+            if let tab = notification.userInfo?["tab"] as? PeopleTab {
+                peopleInitialTab = tab
+            }
+            isPresented = true
         }
     }
 }
@@ -87,6 +105,7 @@ public struct UserProfile: View {
 /// A toolbar-ready user profile button that displays a user avatar and opens the profile sheet
 public struct UserProfileToolbarButton: View {
     @State private var isPresented = false
+    @State private var peopleInitialTab: PeopleTab? = nil
     @Environment(\.entityAuthProvider) private var provider
     private let featureFlags: UserProfileFeatureFlags
     private let modeIndicator: UserProfileModeIndicator?
@@ -130,8 +149,16 @@ public struct UserProfileToolbarButton: View {
                 isPresented: $isPresented,
                 featureFlags: featureFlags,
                 modeIndicator: modeIndicator,
-                peopleMode: peopleMode
+                peopleMode: peopleMode,
+                peopleInitialTab: peopleInitialTab
             )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openUserProfileToPeople)) { notification in
+            // Handle notification to open People section
+            if let tab = notification.userInfo?["tab"] as? PeopleTab {
+                peopleInitialTab = tab
+            }
+            isPresented = true
         }
     }
 }
@@ -147,11 +174,22 @@ private enum ProfileSection: String, CaseIterable, Hashable {
     case docs
     case changelog
 
-    var title: String {
+    func title(modeIndicator: UserProfileModeIndicator? = nil) -> String {
         switch self {
         case .account: return "Account"
         case .organizations: return "Organizations"
-        case .invitations: return "People"
+        case .invitations:
+            if let modeIndicator {
+                switch modeIndicator {
+                case .personal:
+                    return "Invite friends"
+                case .work:
+                    return "Invite & join organizations"
+                case .both:
+                    return "People"
+                }
+            }
+            return "People"
         case .preferences: return "Preferences"
         case .security: return "Security"
         case .deleteAccount: return "Delete Account"
@@ -217,12 +255,31 @@ private struct UserProfileSheet: View {
     @State private var selected: ProfileSection = .account
     @State private var path: [ProfileSection] = []
     @State private var isEditingAccount: Bool = false
+    @State private var peopleBadgeCount: Int = 0
+    #if os(iOS)
+    @State private var selectedDetent: PresentationDetent = .large
+    #endif
+    let peopleInitialTab: PeopleTab?
     @Environment(\.entityAuthProvider) private var provider
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.profileImageUploader) private var profileImageUploader
     let featureFlags: UserProfileFeatureFlags
     let modeIndicator: UserProfileModeIndicator?
     let peopleMode: UserProfilePeopleMode
+    
+    init(
+        isPresented: Binding<Bool>,
+        featureFlags: UserProfileFeatureFlags,
+        modeIndicator: UserProfileModeIndicator?,
+        peopleMode: UserProfilePeopleMode,
+        peopleInitialTab: PeopleTab? = nil
+    ) {
+        self._isPresented = isPresented
+        self.featureFlags = featureFlags
+        self.modeIndicator = modeIndicator
+        self.peopleMode = peopleMode
+        self.peopleInitialTab = peopleInitialTab
+    }
     
     private var visibleSections: [ProfileSection] {
         ProfileSection.visibleSections(with: featureFlags, modeIndicator: modeIndicator)
@@ -241,13 +298,65 @@ private struct UserProfileSheet: View {
     }
 
     var body: some View {
-        #if os(iOS)
-        contentIOS
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        #else
-        contentMac.frame(minWidth: 700, minHeight: 480)
-        #endif
+        Group {
+            #if os(iOS)
+            contentIOS
+                .presentationDetents([.medium, .large], selection: $selectedDetent)
+                .presentationDragIndicator(.visible)
+            #else
+            contentMac.frame(minWidth: 700, minHeight: 480)
+            #endif
+        }
+        .task {
+            await fetchPeopleBadgeCount()
+        }
+        .onChange(of: isPresented) { oldValue, newValue in
+            // Refresh badge count when sheet is presented
+            if newValue {
+                #if os(iOS)
+                // Reset to large detent when sheet is presented
+                selectedDetent = .large
+                #endif
+                Task {
+                    await fetchPeopleBadgeCount()
+                }
+                // If we have an initial tab, select People section
+                if peopleInitialTab != nil {
+                    selected = .invitations
+                }
+            }
+        }
+    }
+    
+    /// Fetch badge count for People section (invitations + friend requests)
+    /// This is handled entirely inside the SDK so host apps don't need to wire custom hooks
+    @MainActor
+    private func fetchPeopleBadgeCount() async {
+        let snapshot = await provider.currentSnapshot()
+        guard let userId = snapshot.userId else {
+            peopleBadgeCount = 0
+            return
+        }
+        
+        let peopleService = provider.makePeopleService()
+        
+        do {
+            // Fetch received invitations and friend requests in parallel
+            async let receivedInvitesTask = peopleService.listReceivedInvitations(userId: userId, cursor: nil, limit: 100)
+            async let receivedFriendReqsTask = peopleService.listReceivedFriendRequests(targetUserId: userId, cursor: nil, limit: 100)
+            
+            let (receivedInvites, receivedFriendReqs) = try await (receivedInvitesTask, receivedFriendReqsTask)
+            
+            // Count pending items
+            let pendingInvites = receivedInvites.items.filter { $0.status == "pending" }.count
+            let pendingFriends = receivedFriendReqs.items.filter { $0.status == "pending" }.count
+            
+            peopleBadgeCount = pendingInvites + pendingFriends
+        } catch {
+            // On error, just clear the badge; the People tab itself will show
+            // a proper error banner when opened.
+            peopleBadgeCount = 0
+        }
     }
 
     // MARK: - iOS: Header + row buttons that push to detail views
@@ -303,7 +412,9 @@ private struct UserProfileSheet: View {
                     section: section,
                     isPresented: $isPresented,
                     featureFlags: featureFlags,
-                    peopleMode: peopleMode
+                    modeIndicator: modeIndicator,
+                    peopleMode: peopleMode,
+                    peopleInitialTab: peopleInitialTab
                 )
                     .toolbar {
                         #if os(iOS)
@@ -405,9 +516,22 @@ private struct UserProfileSheet: View {
                             }
                         }
                         .frame(width: 16, height: 16)
-                        Text(section.title)
+                        Text(section.title(modeIndicator: modeIndicator))
                             .font(.system(.subheadline, design: .rounded, weight: selected == section ? .semibold : .medium))
                         Spacer()
+                        
+                        // Badge for invitations section
+                        if section == .invitations && peopleBadgeCount > 0 {
+                            Text("\(peopleBadgeCount)")
+                                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill(selected == section ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.2))
+                                )
+                                .foregroundColor(selected == section ? .accentColor : .secondary)
+                        }
                     }
                     .foregroundStyle(selected == section ? Color.primary : Color.secondary)
                     .padding(.horizontal, 14)
@@ -588,7 +712,7 @@ private struct UserProfileSheet: View {
             Text("Invitations")
                 .font(.system(.title2, design: .rounded, weight: .semibold))
             
-            PeopleContent(mode: peopleMode)
+            PeopleView(mode: peopleMode, initialTab: peopleInitialTab)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
@@ -718,12 +842,25 @@ private struct UserProfileSheet: View {
                     }
                     .frame(width: 20, height: 20)
                     
-                    Text(section.title)
+                    Text(section.title(modeIndicator: modeIndicator))
                         .font(.system(.body, design: .rounded, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Badge for invitations section
+                if section == .invitations && peopleBadgeCount > 0 {
+                    Text("\(peopleBadgeCount)")
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color.accentColor.opacity(0.2))
+                        )
+                        .foregroundColor(.accentColor)
+                }
                 
                 // Chevron
                 HStack(spacing: 8) {
@@ -899,7 +1036,9 @@ private struct SectionDetail: View {
     @Environment(\.profileImageUploader) private var profileImageUploader
     @Binding var isPresented: Bool
     let featureFlags: UserProfileFeatureFlags
+    let modeIndicator: UserProfileModeIndicator?
     let peopleMode: UserProfilePeopleMode
+    let peopleInitialTab: PeopleTab?
     @State private var isEditingAccount: Bool = false
 
     var body: some View {
@@ -927,7 +1066,7 @@ private struct SectionDetail: View {
                     OrganizationsSectionView(onDismiss: { isPresented = false }, showsHeader: false)
                     
                 case .invitations:
-                    PeopleContent(mode: peopleMode)
+                    PeopleView(mode: peopleMode, initialTab: peopleInitialTab)
                     
                 case .preferences:
                     PreferencesSectionView(showsHeader: false)
@@ -972,7 +1111,7 @@ private struct SectionDetail: View {
             }
             .padding()
         }
-        .navigationTitle(section.title)
+        .navigationTitle(section.title(modeIndicator: modeIndicator))
         .toolbar {
             if section == .account {
                 ToolbarItem(placement: .automatic) {

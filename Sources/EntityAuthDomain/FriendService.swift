@@ -30,6 +30,11 @@ public struct FriendRequest: Codable, Sendable, Identifiable, Hashable {
     public let status: String
     public let createdAt: Double
     public let respondedAt: Double?
+    // Optional enriched fields for better UI (filled by /api/friends route)
+    public let requesterEmail: String?
+    public let requesterUsername: String?
+    public let targetUserEmail: String?
+    public let targetUserUsername: String?
 }
 
 public struct FriendRequestListResponse: Codable, Sendable {
