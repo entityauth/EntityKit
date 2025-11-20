@@ -196,14 +196,20 @@ final class PeopleStoreTests: XCTestCase {
         setupStore()
         mockService.friendError = PeopleError.friend(.duplicate)
         
-        // startFriendRequest throws but doesn't set friendsError directly
-        // The error is caught and stored when loadSentFriendRequests is called
+        // Duplicate friend requests are treated as a soft-success:
+        // startFriendRequest should not throw, but friendsError should be set
         do {
             try await store.startFriendRequest(targetUserId: "user_2")
-            XCTFail("Should have thrown error")
         } catch {
-            // Error is thrown, which is expected
-            XCTAssertTrue(error is PeopleError)
+            XCTFail("Expected duplicate friend error to be handled without throwing, got: \(error)")
+        }
+        
+        if let error = store.friendsError,
+           case PeopleError.friend(let friendError) = error,
+           case .duplicate = friendError {
+            // expected
+        } else {
+            XCTFail("Expected friendsError to be PeopleError.friend(.duplicate)")
         }
     }
     
@@ -304,7 +310,11 @@ final class PeopleStoreTests: XCTestCase {
             targetUserId: "user_123",
             status: "pending",
             createdAt: Date().timeIntervalSince1970 * 1000,
-            respondedAt: nil
+            respondedAt: nil,
+            requesterEmail: nil,
+            requesterUsername: nil,
+            targetUserEmail: nil,
+            targetUserUsername: nil
         )
         
         let acceptedRequest = FriendRequest(
@@ -313,7 +323,11 @@ final class PeopleStoreTests: XCTestCase {
             targetUserId: "user_123",
             status: "accepted",
             createdAt: Date().timeIntervalSince1970 * 1000,
-            respondedAt: Date().timeIntervalSince1970 * 1000
+            respondedAt: Date().timeIntervalSince1970 * 1000,
+            requesterEmail: nil,
+            requesterUsername: nil,
+            targetUserEmail: nil,
+            targetUserUsername: nil
         )
         
         mockService.friendRequestsResponse = FriendRequestListResponse(
@@ -348,7 +362,11 @@ final class PeopleStoreTests: XCTestCase {
             targetUserId: "user_123",
             status: "pending",
             createdAt: Date().timeIntervalSince1970 * 1000,
-            respondedAt: nil
+            respondedAt: nil,
+            requesterEmail: nil,
+            requesterUsername: nil,
+            targetUserEmail: nil,
+            targetUserUsername: nil
         )
         
         mockService.invitationsResponse = InvitationListResponse(

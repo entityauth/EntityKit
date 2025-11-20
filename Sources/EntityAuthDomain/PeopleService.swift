@@ -206,7 +206,7 @@ public final class PeopleService: PeopleServiceProtocol {
             return response.users
         } catch let error as EntityAuthError {
             // Extract error code from network error message if available
-            if case .network(let statusCode, let message) = error,
+            if case .network(_, let message) = error,
                let message = message,
                let jsonData = message.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
@@ -375,7 +375,7 @@ public final class PeopleService: PeopleServiceProtocol {
             return response.friends
         } catch let error as EntityAuthError {
             // Extract error code from network error message if available
-            if case .network(let statusCode, let message) = error,
+            if case .network(_, let message) = error,
                let message = message,
                let jsonData = message.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
@@ -391,7 +391,7 @@ public final class PeopleService: PeopleServiceProtocol {
     }
     
     public func removeFriendConnection(friendId: String) async throws {
-        var queryItems: [URLQueryItem] = [
+        let queryItems: [URLQueryItem] = [
             .init(name: "friendId", value: friendId)
         ]
         let req = APIRequest(method: .delete, path: "/api/friends/connections", queryItems: queryItems)
@@ -400,7 +400,7 @@ public final class PeopleService: PeopleServiceProtocol {
             _ = try await client.send(req)
         } catch let error as EntityAuthError {
             // Extract error code from network error message if available
-            if case .network(let statusCode, let message) = error,
+            if case .network(_, let message) = error,
                let message = message,
                let jsonData = message.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
