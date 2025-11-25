@@ -214,6 +214,7 @@ private enum ProfileSection: String, CaseIterable, Hashable {
     }
     
     /// Returns sections that should be visible based on feature flags and mode.
+    /// Note: This is now only used for filtering - grouping is handled in the UI.
     /// - Parameters:
     ///   - flags: Feature flags controlling optional sections.
     ///   - modeIndicator: When `.personal`, we hide Organizations to keep the
@@ -223,6 +224,7 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         with flags: UserProfileFeatureFlags,
         modeIndicator: UserProfileModeIndicator?
     ) -> [ProfileSection] {
+        // This function is kept for compatibility but grouping is now handled in the UI
         var sections: [ProfileSection] = [.account, .invitations]
 
         // Only show Organizations when we are not explicitly in personal mode.
@@ -230,8 +232,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
             sections.insert(.organizations, at: 1)
         }
 
-        // Note: .accounts is NOT added to the menu sections - it appears only in the footer
-        // (just before Sign out), matching the web version behavior.
+        // Note: .accounts is NOT added to the menu sections - it appears in the toolbar
+        // matching the web version behavior.
 
         if flags.showPreferences {
             sections.append(.preferences)
@@ -364,7 +366,7 @@ private struct UserProfileSheet: View {
     private var contentIOS: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
                     if let badge = modeBadge {
                         HStack {
                             Circle()
@@ -376,18 +378,71 @@ private struct UserProfileSheet: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    // Section Cards
-                    VStack(spacing: 12) {
-                        ForEach(visibleSections, id: \.self) { section in
-                            sectionRow(section)
+                    
+                    // Account Group
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Account")
+                            .font(.system(.caption2, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 4)
+                        
+                        VStack(spacing: 12) {
+                            sectionRow(.account)
+                            if featureFlags.showPreferences {
+                                sectionRow(.preferences)
+                            }
                         }
                     }
                     
-                    // Switch Account Button (iOS - appears before Sign out, matching macOS behavior)
-                    switchAccountRow
+                    // People & Organizations Group
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(modeIndicator == .personal ? "People" : "Organizations")
+                            .font(.system(.caption2, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 4)
+                        
+                        VStack(spacing: 12) {
+                            sectionRow(.invitations)
+                            if modeIndicator != .personal {
+                                sectionRow(.organizations)
+                            }
+                            if featureFlags.showSecurity {
+                                sectionRow(.security)
+                            }
+                        }
+                    }
                     
-                    // Sign Out Button
-                    signOutRow
+                    // Resources Group (if docs enabled)
+                    if featureFlags.showDocs && featureFlags.docsAppName != nil {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Resources")
+                                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(spacing: 12) {
+                                sectionRow(.docs)
+                                sectionRow(.changelog)
+                            }
+                        }
+                    }
+                    
+                    // Account Actions Group (iOS)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Account Actions")
+                            .font(.system(.caption2, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 4)
+                        
+                        VStack(spacing: 12) {
+                            sectionRow(.deleteAccount)
+                            signOutRow
+                        }
+                    }
                 }
                 .padding(16)
             }
@@ -405,6 +460,48 @@ private struct UserProfileSheet: View {
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button(action: {
+                        path.append(.accounts)
+                    }) {
+                        Image("Users", bundle: .module)
+                            .resizable()
+                            .renderingMode(.original)
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 36, height: 36)
+                    .background {
+                        #if os(iOS)
+                        if #available(iOS 26.0, *) {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .glassEffect(.regular.interactive(true), in: .circle)
+                        } else {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                        }
+                        #else
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                        #endif
+                    }
+                    .overlay {
+                        Circle()
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
+                                        Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    }
+                    .help("Switch account")
                 }
             }
             .navigationDestination(for: ProfileSection.self) { section in
@@ -496,110 +593,82 @@ private struct UserProfileSheet: View {
                 }
                 .padding(12)
             }
-            // Navigation Buttons
-            VStack(spacing: 6) {
-                ForEach(visibleSections, id: \.self) { section in
-                Button(action: { 
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selected = section 
-                    }
-                }) {
-                    HStack(spacing: 10) {
-                        Group {
-                            if section.iconName.hasPrefix("system:") {
-                                Image(systemName: String(section.iconName.dropFirst(7)))
-                                    .font(.system(size: 16, weight: .medium))
-                            } else {
-                                Image(section.iconName, bundle: .module)
-                                    .resizable()
-                                    .renderingMode(.original)
-                            }
-                        }
-                        .frame(width: 16, height: 16)
-                        Text(section.title(modeIndicator: modeIndicator))
-                            .font(.system(.subheadline, design: .rounded, weight: selected == section ? .semibold : .medium))
-                        Spacer()
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Account Group
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Account")
+                            .font(.system(.caption2, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 4)
                         
-                        // Badge for invitations section
-                        if section == .invitations && peopleBadgeCount > 0 {
-                            Text("\(peopleBadgeCount)")
-                                .font(.system(.caption2, design: .rounded, weight: .semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(selected == section ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.2))
-                                )
-                                .foregroundColor(selected == section ? .accentColor : .secondary)
-                        }
-                    }
-                    .foregroundStyle(selected == section ? Color.primary : Color.secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                    .background {
-                        if selected == section {
-                            #if os(macOS)
-                            if #available(macOS 15.0, *) {
-                                Capsule()
-                                    .fill(.regularMaterial)
-                                    .glassEffect(.regular.interactive(true), in: .capsule)
-                            } else {
-                                Capsule()
-                                    .fill(Color.accentColor.opacity(0.15))
+                        VStack(spacing: 6) {
+                            sectionButton(.account)
+                            if featureFlags.showPreferences {
+                                sectionButton(.preferences)
                             }
-                            #endif
+                        }
+                    }
+                    
+                    // People & Organizations Group
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(modeIndicator == .personal ? "People" : "Organizations")
+                            .font(.system(.caption2, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 4)
+                        
+                        VStack(spacing: 6) {
+                            sectionButton(.invitations)
+                            if modeIndicator != .personal {
+                                sectionButton(.organizations)
+                            }
+                            if featureFlags.showSecurity {
+                                sectionButton(.security)
+                            }
+                        }
+                    }
+                    
+                    // Resources Group (if docs enabled)
+                    if featureFlags.showDocs && featureFlags.docsAppName != nil {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Resources")
+                                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 4)
+                            
+                            VStack(spacing: 6) {
+                                sectionButton(.docs)
+                                sectionButton(.changelog)
+                            }
                         }
                     }
                 }
+                .padding(.vertical, 8)
             }
             
             Spacer()
             
-            // Account Switcher Button (above Sign out)
-            Button(action: {
-                selected = .accounts
-            }) {
-                HStack(spacing: 10) {
-                    Image("AtSign", bundle: .module)
-                        .resizable()
-                        .renderingMode(.original)
-                        .frame(width: 16, height: 16)
-                    Text("Switch account")
-                        .font(.system(.subheadline, design: .rounded, weight: .medium))
-                    Spacer()
+            // Account Actions Footer
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Account Actions")
+                    .font(.system(.caption2, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 4)
+                
+                VStack(spacing: 6) {
+                    sectionButton(.deleteAccount)
+                    signOutButton
                 }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
-            
-            // Sign Out Button (at bottom, inside container)
-            Button(action: {
-                Task {
-                    try? await provider.logout()
-                    isPresented = false
-                }
-            }) {
-                HStack(spacing: 10) {
-                    Image("PowerOff", bundle: .module)
-                        .resizable()
-                        .renderingMode(.original)
-                        .frame(width: 16, height: 16)
-                    Text("Sign out")
-                        .font(.system(.subheadline, design: .rounded, weight: .medium))
-                    Spacer()
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
         }
         .padding(12)
         .frame(maxHeight: .infinity)
@@ -651,28 +720,191 @@ private struct UserProfileSheet: View {
     }
 
     private var detail: some View {
-        ScrollView {
-            switch selected {
-            case .account:
-                accountDetailView
-            case .organizations:
-                organizationsDetailView
-            case .invitations:
-                invitationsDetailView
-            case .preferences:
-                preferencesDetailView
-            case .security:
-                securityDetailView
-            case .deleteAccount:
-                deleteAccountDetailView
-            case .accounts:
-                AccountSwitcherView()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            case .docs:
-                docsDetailView
-            case .changelog:
-                changelogDetailView
+        VStack(spacing: 0) {
+            // Toolbar at top
+            HStack {
+                Spacer()
+                Button(action: {
+                    selected = .accounts
+                }) {
+                    Image("Users", bundle: .module)
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .frame(width: 36, height: 36)
+                .background {
+                    #if os(macOS)
+                    if #available(macOS 15.0, *) {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .glassEffect(.regular.interactive(true), in: .circle)
+                    } else {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                    }
+                    #endif
+                }
+                .overlay {
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
+                                    Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                }
+                .help("Switch account")
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .frame(height: 1)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
+            
+            // Content
+            ScrollView {
+                switch selected {
+                case .account:
+                    accountDetailView
+                case .organizations:
+                    organizationsDetailView
+                case .invitations:
+                    invitationsDetailView
+                case .preferences:
+                    preferencesDetailView
+                case .security:
+                    securityDetailView
+                case .deleteAccount:
+                    deleteAccountDetailView
+                case .accounts:
+                    AccountSwitcherView()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                case .docs:
+                    docsDetailView
+                case .changelog:
+                    changelogDetailView
+                }
+            }
+        }
+    }
+    
+    // MARK: - Helper Views
+    
+    private func sectionButton(_ section: ProfileSection) -> some View {
+        Button(action: { 
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selected = section 
+            }
+        }) {
+            HStack(spacing: 10) {
+                Group {
+                    if section.iconName.hasPrefix("system:") {
+                        Image(systemName: String(section.iconName.dropFirst(7)))
+                            .font(.system(size: 16, weight: .medium))
+                    } else {
+                        Image(section.iconName, bundle: .module)
+                            .resizable()
+                            .renderingMode(.original)
+                    }
+                }
+                .frame(width: 16, height: 16)
+                Text(section.title(modeIndicator: modeIndicator))
+                    .font(.system(.subheadline, design: .rounded, weight: selected == section ? .semibold : .medium))
+                Spacer()
+                
+                // Badge for invitations section
+                if section == .invitations && peopleBadgeCount > 0 {
+                    Text("\(peopleBadgeCount)")
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(selected == section ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.2))
+                        )
+                        .foregroundColor(selected == section ? .accentColor : .secondary)
+                }
+            }
+            .foregroundStyle(selected == section ? Color.primary : Color.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background {
+            if selected == section {
+                #if os(macOS)
+                if #available(macOS 15.0, *) {
+                    Capsule()
+                        .fill(.regularMaterial)
+                        .glassEffect(.regular.interactive(true), in: .capsule)
+                } else {
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.15))
+                }
+                #endif
+            }
+        }
+    }
+    
+    private var signOutButton: some View {
+        Button(action: {
+            Task {
+                try? await provider.logout()
+                isPresented = false
+            }
+        }) {
+            HStack(spacing: 10) {
+                Image("PowerOff", bundle: .module)
+                    .resizable()
+                    .renderingMode(.original)
+                    .frame(width: 16, height: 16)
+                Text("Sign out")
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background {
+            #if os(macOS)
+            if #available(macOS 15.0, *) {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .glassEffect(.regular.interactive(true), in: .capsule)
+            } else {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+            }
+            #endif
+        }
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
+                            Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         }
     }
     
@@ -960,7 +1192,7 @@ private struct UserProfileSheet: View {
     }
 
     private var signOutRow: some View {
-        Button(role: .destructive, action: {
+        Button(action: {
             Task {
                 try? await provider.logout()
                 isPresented = false
@@ -974,7 +1206,7 @@ private struct UserProfileSheet: View {
                 
                 Text("Sign out")
                     .font(.system(.body, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 
                 Spacer()
             }
@@ -985,19 +1217,32 @@ private struct UserProfileSheet: View {
                     #if os(iOS)
                     if #available(iOS 26.0, *) {
                         Capsule()
-                            .fill(.red.gradient)
+                            .fill(.ultraThinMaterial)
                             .glassEffect(.regular.interactive(true), in: .capsule)
                     } else {
                         Capsule()
-                            .fill(.red.gradient)
+                            .fill(.ultraThinMaterial)
                     }
                     #else
                     Capsule()
-                        .fill(.red.gradient)
+                        .fill(.ultraThinMaterial)
                     #endif
                 }
             )
-            .shadow(color: .red.opacity(0.3), radius: 8, x: 0, y: 4)
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
+                                Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            }
         }
         .buttonStyle(.plain)
     }
