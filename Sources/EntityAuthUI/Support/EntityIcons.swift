@@ -18,6 +18,7 @@ public enum EntityIcon: String, CaseIterable {
     case at_sign_light = "AtSignLight"
     case chat = "Chat"
     case delete_x = "DeleteX"
+    case file = "File"
     case folder = "Folder"
     case home = "Home"
     case inbox = "Inbox"
@@ -31,6 +32,7 @@ public enum EntityIcon: String, CaseIterable {
     case sitemap = "Sitemap"
     case sparkle = "Sparkle"
     case square_grid = "SquareGrid"
+    case timeline_vertical = "TimelineVertical"
     case user = "User"
     case users = "Users"
     

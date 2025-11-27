@@ -208,8 +208,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
         case .security: return "Lock"
         case .deleteAccount: return "DeleteX"
         case .accounts: return "AtSign"
-        case .docs: return "system:doc.text" // Documentation icon (system icon)
-        case .changelog: return "system:clock.arrow.circlepath" // Changelog icon (system icon)
+        case .docs: return "File" // Documentation icon
+        case .changelog: return "TimelineVertical" // Changelog icon
         }
     }
     
