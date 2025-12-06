@@ -8,6 +8,9 @@ internal struct AuthFormContent: View {
     @Binding var password: String
     @Binding var errorText: String?
     
+    var authMethods: AuthMethods
+    var isModal: Bool
+    
     var onGoogleSignIn: (() async -> Void)?
     var onGitHubSignIn: (() async -> Void)?
     var onPasskeySignIn: (() async -> Void)?
@@ -44,49 +47,63 @@ internal struct AuthFormContent: View {
             
             // Card - Contains Tab Picker and Forms
             VStack(spacing: 0) {
-                // Tab Picker
-                CustomTabPicker(selection: $selectedAuthTab)
-                    .padding(.bottom, 4)
+                // Tab Picker (only show if email/password is enabled)
+                if authMethods.emailPassword {
+                    CustomTabPicker(selection: $selectedAuthTab)
+                        .padding(.bottom, 4)
+                }
                 
-                if selectedAuthTab == .signIn {
-                    signInView
+                if authMethods.emailPassword {
+                    if selectedAuthTab == .signIn {
+                        signInView
+                    } else {
+                        registerView
+                    }
                 } else {
-                    registerView
+                    // If email/password is disabled, show only SSO/passkey options
+                    ssoAndPasskeyOnlyView
                 }
             }
             .padding(24)
             .background(
                 Group {
-                    #if os(iOS)
-                    if #available(iOS 26.0, *) {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.regularMaterial)
-                            .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
-                    } else {
+                    // Don't show background in modal (modal already has bg)
+                    if !isModal {
+                        #if os(iOS)
+                        if #available(iOS 26.0, *) {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.regularMaterial)
+                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
+                        } else {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.ultraThinMaterial)
+                        }
+                        #elseif os(macOS)
+                        if #available(macOS 15.0, *) {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.regularMaterial)
+                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
+                        } else {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.ultraThinMaterial)
+                        }
+                        #else
                         RoundedRectangle(cornerRadius: 24)
                             .fill(.ultraThinMaterial)
+                        #endif
                     }
-                    #elseif os(macOS)
-                    if #available(macOS 15.0, *) {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.regularMaterial)
-                            .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
-                    } else {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.ultraThinMaterial)
-                    }
-                    #else
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(.ultraThinMaterial)
-                    #endif
                 }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
+                Group {
+                    if !isModal {
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
+                    }
+                }
             )
             .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.12), radius: 16, x: 0, y: 4)
+            .shadow(color: isModal ? .clear : .black.opacity(colorScheme == .dark ? 0.08 : 0.12), radius: isModal ? 0 : 16, x: 0, y: isModal ? 0 : 4)
         }
         .frame(idealWidth: idealWidth)
         .padding()
@@ -103,7 +120,8 @@ internal struct AuthFormContent: View {
                 .frame(height: 4)
             
             VStack(spacing: 12) {
-            // Email/Password Form
+            // Email/Password Form (only if enabled)
+            if authMethods.emailPassword {
             #if os(iOS)
             TextField("", text: $email, prompt: Text("Email"))
                 .textFieldStyle(.plain)
@@ -224,14 +242,145 @@ internal struct AuthFormContent: View {
             .buttonStyle(.plain)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
             .opacity((email.isEmpty || password.isEmpty || isLoading) ? 0.5 : 1.0)
+            }
             
             // SSO & Passkey Buttons
             HStack(spacing: 12) {
-                ssoButton(icon: "Google", action: onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText))
-                ssoButton(icon: "Github", action: onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText))
-                ssoButton(icon: "Passkey", action: onPasskeySignIn ?? AuthDefaultActions.makePasskeySignIn(provider: provider, errorText: $errorText))
+                if authMethods.sso.google {
+                    ssoButton(icon: "Google", action: onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText))
+                }
+                if authMethods.sso.github {
+                    ssoButton(icon: "Github", action: onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText))
+                }
+                if authMethods.passkey {
+                    ssoButton(icon: "Passkey", action: onPasskeySignIn ?? AuthDefaultActions.makePasskeySignIn(provider: provider, errorText: $errorText))
+                }
             }
             }
+        }
+    }
+    
+    // MARK: - SSO and Passkey Only View (when email/password is disabled)
+    
+    private var ssoAndPasskeyOnlyView: some View {
+        VStack(spacing: 24) {
+            // SSO & Passkey Buttons - Circular with text labels
+            HStack(spacing: 20) {
+                if authMethods.sso.google {
+                    circularAuthButton(icon: "Google", label: "Google", action: onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText))
+                }
+                if authMethods.sso.github {
+                    circularAuthButton(icon: "Github", label: "GitHub", action: onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText))
+                }
+                if authMethods.passkey {
+                    VStack(spacing: 8) {
+                        Button(action: {
+                            showPasskeySignUpSheet = true
+                        }) {
+                            Image("Passkey", bundle: .module)
+                                .resizable()
+                                .renderingMode(.original)
+                                .frame(width: 24, height: 24)
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    Group {
+                                        #if os(iOS)
+                                        if #available(iOS 26.0, *) {
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                .fill(.regularMaterial)
+                                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 16))
+                                        } else {
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+                                        }
+                                        #elseif os(macOS)
+                                        if #available(macOS 15.0, *) {
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                .fill(.regularMaterial)
+                                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 16))
+                                        } else {
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
+                                        }
+                                        #else
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+                                        #endif
+                                    }
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isLoading)
+                        .opacity(isLoading ? 0.5 : 1.0)
+                        
+                        Text("Passkey")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Squircle Auth Button (for SSO/passkey only mode)
+    
+    @ViewBuilder
+    private func circularAuthButton(icon: String, label: String, action: @escaping () async -> Void) -> some View {
+        VStack(spacing: 8) {
+            Button(action: {
+                Task {
+                    isLoading = true
+                    await action()
+                    isLoading = false
+                }
+            }) {
+                Image(icon, bundle: .module)
+                    .resizable()
+                    .renderingMode(.original)
+                    .frame(width: 24, height: 24)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        Group {
+                            #if os(iOS)
+                            if #available(iOS 26.0, *) {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(.regularMaterial)
+                                    .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 16))
+                            } else {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+                            }
+                            #elseif os(macOS)
+                            if #available(macOS 15.0, *) {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(.regularMaterial)
+                                    .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 16))
+                            } else {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
+                            }
+                            #else
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+                            #endif
+                        }
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(isLoading)
+            .opacity(isLoading ? 0.5 : 1.0)
+            
+            Text(label)
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(.secondary)
         }
     }
     
@@ -243,6 +392,8 @@ internal struct AuthFormContent: View {
                 .frame(height: 4)
             
             VStack(spacing: 12) {
+            // Email/Password Form (only if enabled)
+            if authMethods.emailPassword {
             #if os(iOS)
             TextField("", text: $email, prompt: Text("Email"))
                 .textFieldStyle(.plain)
@@ -363,47 +514,55 @@ internal struct AuthFormContent: View {
             .buttonStyle(.plain)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
             .opacity((email.isEmpty || password.isEmpty || isLoading) ? 0.5 : 1.0)
+            }
             
             // SSO & Passkey Buttons
             HStack(spacing: 12) {
-                ssoButton(icon: "Google", action: onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText))
-                ssoButton(icon: "Github", action: onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText))
-                Button(action: { showPasskeySignUpSheet = true }) {
-                    Image("Passkey", bundle: .module)
-                        .resizable()
-                        .renderingMode(.original)
-                        .frame(width: 20, height: 20)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            Group {
-                                #if os(iOS)
-                                if #available(iOS 26.0, *) {
-                                    Capsule()
-                                        .fill(.regularMaterial)
-                                        .glassEffect(.regular.interactive(true), in: .capsule)
-                                } else {
+                if authMethods.sso.google {
+                    ssoButton(icon: "Google", action: onGoogleSignIn ?? AuthDefaultActions.makeGoogleSignIn(provider: provider, errorText: $errorText))
+                }
+                if authMethods.sso.github {
+                    ssoButton(icon: "Github", action: onGitHubSignIn ?? AuthDefaultActions.makeGitHubSignIn(provider: provider, errorText: $errorText))
+                }
+                if authMethods.passkey {
+                    Button(action: { showPasskeySignUpSheet = true }) {
+                        Image("Passkey", bundle: .module)
+                            .resizable()
+                            .renderingMode(.original)
+                            .frame(width: 20, height: 20)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                Group {
+                                    #if os(iOS)
+                                    if #available(iOS 26.0, *) {
+                                        Capsule()
+                                            .fill(.regularMaterial)
+                                            .glassEffect(.regular.interactive(true), in: .capsule)
+                                    } else {
+                                        Capsule()
+                                            .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+                                    }
+                                    #elseif os(macOS)
+                                    if #available(macOS 15.0, *) {
+                                        Capsule()
+                                            .fill(.regularMaterial)
+                                            .glassEffect(.regular.interactive(true), in: .capsule)
+                                    } else {
+                                        Capsule()
+                                            .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
+                                    }
+                                    #else
                                     Capsule()
                                         .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+                                    #endif
                                 }
-                                #elseif os(macOS)
-                                if #available(macOS 15.0, *) {
-                                    Capsule()
-                                        .fill(.regularMaterial)
-                                        .glassEffect(.regular.interactive(true), in: .capsule)
-                                } else {
-                                    Capsule()
-                                        .fill(colorScheme == .dark ? Color(.systemGray).opacity(0.1) : Color(.systemGray).opacity(0.2))
-                                }
-                                #else
-                                Capsule()
-                                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
-                                #endif
-                            }
-                        )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isLoading)
+                    .opacity(isLoading ? 0.5 : 1.0)
                 }
-                .buttonStyle(.plain)
-                .disabled(isLoading)
             }
             }
         }

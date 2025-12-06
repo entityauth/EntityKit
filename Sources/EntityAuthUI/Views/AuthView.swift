@@ -318,7 +318,7 @@ public struct AuthView: View {
                     .padding(.bottom, 24)
             }
             
-            // Card - Contains Tab Picker and Forms
+            // Content - No background container in modal (modal already has bg)
             VStack(spacing: 0) {
                 // Tab Picker
                 CustomTabPicker(selection: $selectedAuthTab)
@@ -331,38 +331,6 @@ public struct AuthView: View {
                 }
             }
             .padding(24)
-            .background(
-                Group {
-                    #if os(iOS)
-                    if #available(iOS 26.0, *) {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.regularMaterial)
-                            .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
-                    } else {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.ultraThinMaterial)
-                    }
-                    #elseif os(macOS)
-                    if #available(macOS 15.0, *) {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.regularMaterial)
-                            .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
-                    } else {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.ultraThinMaterial)
-                    }
-                    #else
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(.ultraThinMaterial)
-                    #endif
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.08 : 0.12), radius: 16, x: 0, y: 4)
         }
         .frame(idealWidth: idealWidth)
         .padding()

@@ -5,11 +5,13 @@ import EntityAuthDomain
 /// This is a clean 1-line API for auth - no TabView, no complexity.
 public struct AuthViewModal: View {
     let title: String
+    let authMethods: AuthMethods
     @State private var isPresented = false
     @Environment(\.colorScheme) private var colorScheme
     
-    public init(title: String = "Sign in") {
+    public init(title: String = "Sign in", authMethods: AuthMethods = AuthMethods()) {
         self.title = title
+        self.authMethods = authMethods
     }
     
     public var body: some View {
@@ -60,7 +62,7 @@ public struct AuthViewModal: View {
     private var modalContent: some View {
         #if os(iOS)
         NavigationView {
-            AuthGate()
+            AuthGate(authMethods: authMethods, isModal: true)
                 .padding()
                 .navigationTitle("Sign In")
                 .navigationBarTitleDisplayMode(.inline)
@@ -90,7 +92,7 @@ public struct AuthViewModal: View {
             .padding(.top, 20)
             .padding(.bottom, 8)
             
-            AuthGate()
+            AuthGate(authMethods: authMethods, isModal: true)
         }
         .presentationSizing(.fitted)
         #endif

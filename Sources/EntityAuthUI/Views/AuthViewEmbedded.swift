@@ -4,9 +4,12 @@ import EntityAuthDomain
 /// Simple embedded auth component - shows the authentication form directly embedded in your view.
 /// This is a clean 1-line API for auth - no TabView, no complexity.
 public struct AuthViewEmbedded: View {
+    let authMethods: AuthMethods
     @Environment(\.colorScheme) private var colorScheme
     
-    public init() {}
+    public init(authMethods: AuthMethods = AuthMethods()) {
+        self.authMethods = authMethods
+    }
     
     public var body: some View {
         #if os(iOS)
@@ -23,7 +26,7 @@ public struct AuthViewEmbedded: View {
                     .font(.system(.title, design: .rounded, weight: .semibold))
                 
                 // Auth form
-                AuthGate()
+                AuthGate(authMethods: authMethods)
             }
             .frame(maxWidth: maxWidth)
             .padding(.horizontal, 24)

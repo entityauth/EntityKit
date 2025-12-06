@@ -1,5 +1,35 @@
 import SwiftUI
 
+// MARK: - Auth Methods Configuration
+
+/// Configuration for which authentication methods are enabled/visible in the form.
+/// Similar to Clerk's dashboard toggles, but configurable in code.
+public struct AuthMethods {
+    public var emailPassword: Bool
+    public var sso: SSOMethods
+    public var passkey: Bool
+    
+    public struct SSOMethods {
+        public var google: Bool
+        public var github: Bool
+        
+        public init(google: Bool = true, github: Bool = true) {
+            self.google = google
+            self.github = github
+        }
+    }
+    
+    public init(
+        emailPassword: Bool = true,
+        sso: SSOMethods = SSOMethods(),
+        passkey: Bool = true
+    ) {
+        self.emailPassword = emailPassword
+        self.sso = sso
+        self.passkey = passkey
+    }
+}
+
 // MARK: - Shared Auth Tab Type
 
 internal enum AuthTab {

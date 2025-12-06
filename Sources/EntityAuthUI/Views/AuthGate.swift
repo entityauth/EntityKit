@@ -9,14 +9,22 @@ public struct AuthGate: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var errorText: String?
+    
+    private var authMethods: AuthMethods
+    private var isModal: Bool
 
-    public init() {}
+    public init(authMethods: AuthMethods = AuthMethods(), isModal: Bool = false) {
+        self.authMethods = authMethods
+        self.isModal = isModal
+    }
 
     public var body: some View {
         AuthFormContent(
             email: $email,
             password: $password,
             errorText: $errorText,
+            authMethods: authMethods,
+            isModal: isModal,
             onGoogleSignIn: signInWithGoogle,
             onGitHubSignIn: signInWithGitHub,
             onPasskeySignIn: signInWithPasskey,
