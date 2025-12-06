@@ -293,7 +293,7 @@ private struct UserProfileSheet: View {
         case .personal:
             return ("Personal space", .green)
         case .work:
-            return ("Work mode", .blue)
+            return ("Workspace", .blue)
         case .both:
             return ("Hybrid mode", .pink)
         }
@@ -452,16 +452,7 @@ private struct UserProfileSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(action: { 
-                        isPresented = false 
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                ToolbarItem(placement: .automatic) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Button(action: {
                         path.append(.accounts)
                     }) {
@@ -502,6 +493,14 @@ private struct UserProfileSheet: View {
                             )
                     }
                     .help("Switch account")
+                    
+                    Button(action: { 
+                        isPresented = false 
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .navigationDestination(for: ProfileSection.self) { section in
@@ -515,7 +514,7 @@ private struct UserProfileSheet: View {
                 )
                     .toolbar {
                         #if os(iOS)
-                        ToolbarItem(placement: .topBarLeading) {
+                        ToolbarItem(placement: .topBarTrailing) {
                             Button(action: { isPresented = false }) {
                                 Image(systemName: "xmark")
                                     .font(.system(size: 12, weight: .semibold))
@@ -1198,26 +1197,40 @@ private struct UserProfileSheet: View {
                 isPresented = false
             }
         }) {
-            HStack(spacing: 12) {
-                Image("PowerOff", bundle: .module)
-                    .resizable()
-                    .renderingMode(.original)
-                    .frame(width: 18, height: 18)
-                
-                Text("Sign out")
-                    .font(.system(.body, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.primary)
+            HStack(spacing: 16) {
+                // Section Info
+                HStack(spacing: 12) {
+                    Image("PowerOff", bundle: .module)
+                        .resizable()
+                        .renderingMode(.original)
+                        .frame(width: 20, height: 20)
+                    
+                    Text("Sign out")
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 
                 Spacer()
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
             .background(
                 Group {
                     #if os(iOS)
                     if #available(iOS 26.0, *) {
                         Capsule()
+                            .fill(.regularMaterial)
+                            .glassEffect(.regular.interactive(true), in: .capsule)
+                    } else {
+                        Capsule()
                             .fill(.ultraThinMaterial)
+                    }
+                    #elseif os(macOS)
+                    if #available(macOS 15.0, *) {
+                        Capsule()
+                            .fill(.regularMaterial)
                             .glassEffect(.regular.interactive(true), in: .capsule)
                     } else {
                         Capsule()
@@ -1229,20 +1242,7 @@ private struct UserProfileSheet: View {
                     #endif
                 }
             )
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
-                                Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
