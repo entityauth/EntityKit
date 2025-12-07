@@ -40,6 +40,7 @@ public actor EntityAuthFacade {
         public var entitiesService: EntitiesProviding
         public var invitationService: InvitationsProviding
         public var friendService: FriendsProviding
+        public var accountTypeService: AccountTypesProviding
         public var refreshHandler: TokenRefresher
         public var apiClient: any APIClientType
         public var realtime: RealtimeSubscriptionHandling
@@ -52,6 +53,7 @@ public actor EntityAuthFacade {
             entitiesService: EntitiesProviding,
             invitationService: InvitationsProviding,
             friendService: FriendsProviding,
+            accountTypeService: AccountTypesProviding,
             refreshHandler: TokenRefresher,
             apiClient: any APIClientType,
             realtime: RealtimeSubscriptionHandling
@@ -64,6 +66,7 @@ public actor EntityAuthFacade {
             self.entitiesService = entitiesService
             self.invitationService = invitationService
             self.friendService = friendService
+            self.accountTypeService = accountTypeService
             self.refreshHandler = refreshHandler
             self.apiClient = apiClient
             self.realtime = realtime
@@ -92,6 +95,7 @@ public actor EntityAuthFacade {
             let entitiesService = EntitiesService(client: client)
             let invitationService = InvitationService(client: client)
             let friendService = FriendService(client: client)
+            let accountTypeService = AccountTypeService(client: client)
             let realtime = RealtimeCoordinator(baseURL: finalConfig.baseURL) { baseURL in
                 let request = APIRequest(method: .get, path: "/api/convex", requiresAuthentication: false)
                 let data = try await client.send(request)
@@ -108,6 +112,7 @@ public actor EntityAuthFacade {
                 entitiesService: entitiesService,
                 invitationService: invitationService,
                 friendService: friendService,
+                accountTypeService: accountTypeService,
                 refreshHandler: refresher,
                 apiClient: client,
                 realtime: realtime
@@ -820,6 +825,48 @@ public actor EntityAuthFacade {
         } catch let error as EntityAuthError {
             throw error
         }
+    }
+    
+    // MARK: - Account Types
+    
+    /// List all available account type configurations for this workspace
+    public func listAccountTypeConfigs() async throws -> [AccountTypeConfig] {
+        try await dependencies.accountTypeService.listConfigs()
+    }
+    
+    /// Get the current user's account type and its configuration
+    public func getUserAccountType() async throws -> UserAccountType {
+        try await dependencies.accountTypeService.getUserAccountType()
+    }
+    
+    /// Set the current user's account type
+    public func setAccountType(key: String) async throws -> UserAccountType {
+        try await dependencies.accountTypeService.setAccountType(key: key)
+    }
+    
+    /// Check if the current user has a specific capability based on their account type
+    public func hasCapability(_ capability: String) async throws -> Bool {
+        try await dependencies.accountTypeService.hasCapability(capability)
+    }
+    
+    /// Get all capabilities for the current user's account type
+    public func getAccountTypeCapabilities() async throws -> AccountTypeCapabilities {
+        try await dependencies.accountTypeService.getCapabilities()
+    }
+    
+    /// Check if user has friends capability (convenience method)
+    public func hasFriendsCapability() async throws -> Bool {
+        try await hasCapability("hasFriends")
+    }
+    
+    /// Check if user has organizations capability (convenience method)
+    public func hasOrgsCapability() async throws -> Bool {
+        try await hasCapability("hasOrgs")
+    }
+    
+    /// Check if user has team invites capability (convenience method)
+    public func hasTeamInvitesCapability() async throws -> Bool {
+        try await hasCapability("hasTeamInvites")
     }
 
     public func addMember(orgId: String, userId: String, role: String) async throws {

@@ -24,17 +24,23 @@ public struct UserProfileFeatureFlags: Sendable {
     public let showSecurity: Bool
     public let showDocs: Bool
     public let docsAppName: String? // e.g., "past", "entity-auth"
+    public let showOrganizations: Bool // Controls invitations and organizations sections
+    public let showSwitchAccount: Bool // Controls switch account button
     
     public init(
         showPreferences: Bool = true,
         showSecurity: Bool = false,
         showDocs: Bool = false,
-        docsAppName: String? = nil
+        docsAppName: String? = nil,
+        showOrganizations: Bool = true,
+        showSwitchAccount: Bool = true
     ) {
         self.showPreferences = showPreferences
         self.showSecurity = showSecurity
         self.showDocs = showDocs
         self.docsAppName = docsAppName
+        self.showOrganizations = showOrganizations
+        self.showSwitchAccount = showSwitchAccount
     }
     
     /// Default flags with only core sections enabled
@@ -294,46 +300,48 @@ private struct UserProfileSheet: View {
     
     @ViewBuilder
     private var toolbarButtons: some View {
-        Button(action: {
-            path.append(.accounts)
-        }) {
-            Image("Users", bundle: .module)
-                .resizable()
-                .renderingMode(.original)
-                .frame(width: 20, height: 20)
-        }
-        .buttonStyle(.plain)
-        .frame(width: 36, height: 36)
-        .background {
-            #if os(iOS)
-            if #available(iOS 26.0, *) {
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .glassEffect(.regular.interactive(true), in: .circle)
-            } else {
-                Circle()
-                    .fill(.ultraThinMaterial)
+        if featureFlags.showSwitchAccount {
+            Button(action: {
+                path.append(.accounts)
+            }) {
+                Image("Users", bundle: .module)
+                    .resizable()
+                    .renderingMode(.original)
+                    .frame(width: 20, height: 20)
             }
-            #else
-            Circle()
-                .fill(.ultraThinMaterial)
-            #endif
+            .buttonStyle(.plain)
+            .frame(width: 36, height: 36)
+            .background {
+                #if os(iOS)
+                if #available(iOS 26.0, *) {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .glassEffect(.regular.interactive(true), in: .circle)
+                } else {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                }
+                #else
+                Circle()
+                    .fill(.ultraThinMaterial)
+                #endif
+            }
+            .overlay {
+                Circle()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
+                                Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .help("Switch account")
         }
-        .overlay {
-            Circle()
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
-                            Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        }
-        .help("Switch account")
         
         Button(action: { 
             isPresented = false 
@@ -440,20 +448,35 @@ private struct UserProfileSheet: View {
                         }
                     }
                     
-                    // People & Organizations Group
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(modeIndicator == .personal ? "People" : "Organizations")
-                            .font(.system(.caption2, design: .rounded, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                            .padding(.horizontal, 4)
-                        
-                        VStack(spacing: 12) {
-                            sectionRow(.invitations)
-                            if modeIndicator != .personal {
-                                sectionRow(.organizations)
+                    // People & Organizations Group (only show if enabled)
+                    if featureFlags.showOrganizations {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(modeIndicator == .personal ? "People" : "Organizations")
+                                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(spacing: 12) {
+                                sectionRow(.invitations)
+                                if modeIndicator != .personal {
+                                    sectionRow(.organizations)
+                                }
+                                if featureFlags.showSecurity {
+                                    sectionRow(.security)
+                                }
                             }
-                            if featureFlags.showSecurity {
+                        }
+                    } else if featureFlags.showSecurity {
+                        // If organizations are hidden but security is enabled, show security in its own group
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Security")
+                                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 4)
+                            
+                            VStack(spacing: 12) {
                                 sectionRow(.security)
                             }
                         }
@@ -727,17 +750,18 @@ private struct UserProfileSheet: View {
             // Toolbar at top
             HStack {
                 Spacer()
-                Button(action: {
-                    selected = .accounts
-                }) {
-                    Image("Users", bundle: .module)
-                        .resizable()
-                        .renderingMode(.original)
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                .frame(width: 36, height: 36)
-                .background {
+                if featureFlags.showSwitchAccount {
+                    Button(action: {
+                        selected = .accounts
+                    }) {
+                        Image("Users", bundle: .module)
+                            .resizable()
+                            .renderingMode(.original)
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 36, height: 36)
+                    .background {
                     #if os(macOS)
                     if #available(macOS 15.0, *) {
                         Circle()
@@ -762,8 +786,9 @@ private struct UserProfileSheet: View {
                             ),
                             lineWidth: 1
                         )
+                    }
+                    .help("Switch account")
                 }
-                .help("Switch account")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

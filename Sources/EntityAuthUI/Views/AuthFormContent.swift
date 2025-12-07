@@ -45,7 +45,7 @@ internal struct AuthFormContent: View {
                     .padding(.bottom, 24)
             }
             
-            // Card - Contains Tab Picker and Forms
+            // Form content - no card styling
             VStack(spacing: 0) {
                 // Tab Picker (only show if email/password is enabled)
                 if authMethods.emailPassword {
@@ -64,46 +64,6 @@ internal struct AuthFormContent: View {
                     ssoAndPasskeyOnlyView
                 }
             }
-            .padding(24)
-            .background(
-                Group {
-                    // Don't show background in modal (modal already has bg)
-                    if !isModal {
-                        #if os(iOS)
-                        if #available(iOS 26.0, *) {
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(.regularMaterial)
-                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
-                        } else {
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(.ultraThinMaterial)
-                        }
-                        #elseif os(macOS)
-                        if #available(macOS 15.0, *) {
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(.regularMaterial)
-                                .glassEffect(.regular.interactive(true), in: .rect(cornerRadius: 24))
-                        } else {
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(.ultraThinMaterial)
-                        }
-                        #else
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(.ultraThinMaterial)
-                        #endif
-                    }
-                }
-            )
-            .overlay(
-                Group {
-                    if !isModal {
-                        RoundedRectangle(cornerRadius: 24)
-                            .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.15), lineWidth: 1)
-                    }
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: isModal ? .clear : .black.opacity(colorScheme == .dark ? 0.08 : 0.12), radius: isModal ? 0 : 16, x: 0, y: isModal ? 0 : 4)
         }
         .frame(idealWidth: idealWidth)
         .padding()
