@@ -367,8 +367,6 @@ struct PeopleContent: View {
             return "Invite teammates"
         case .friends:
             return "Add friends"
-        case .both:
-            return "Invite teammates or add friends"
         }
     }
 

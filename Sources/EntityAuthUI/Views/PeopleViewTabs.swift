@@ -14,119 +14,125 @@ struct PeopleHeroSection: View {
     private var supportsFriends: Bool { mode != .org }
     
     var body: some View {
-        if supportsFriends && !supportsOrg {
-            // Friendly design for personal account mode
-            friendsHeroView
-        } else if supportsOrg && !supportsFriends {
-            // Professional design for workspace account mode
-            orgHeroView
-        } else {
-            // Both modes - balanced design
-            bothHeroView
-        }
-    }
-    
-    private var friendsHeroView: some View {
-        VStack(spacing: 16) {
-            // Avatar placeholders - friendly Memoji-style
-            HStack(spacing: 12) {
-                AvatarCircle(emoji: "👩", color: .pink)
-                AvatarCircle(emoji: "👨", color: .blue)
-                AvatarCircle(emoji: "👧", color: .yellow)
-            }
+        VStack(spacing: 0) {
+            // Centered title
+            Text(titleText)
+                .font(.system(.title, design: .rounded, weight: .bold))
+                .foregroundStyle(.primary)
             
-            VStack(spacing: 8) {
-                Text("Build Your Friend Circle")
-                    .font(.system(.title2, design: .rounded, weight: .bold))
-                    .foregroundStyle(.primary)
-                
-                Text("Connect with the people who matter and share moments together.")
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
+            // Centered subtitle
+            Text(subtitleText)
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
             
-            // Decorative icons
-            HStack(spacing: 16) {
-                DecorativeIcon(emoji: "❤️", color: .red)
-                DecorativeIcon(emoji: "🎁", color: .yellow)
-                DecorativeIcon(emoji: "💬", color: .blue)
-            }
+            // Space
+            Spacer()
+                .frame(height: 32)
+            
+            // 3 overlapping circles
+            OverlappingCirclesView(mode: mode)
         }
-        .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
     }
     
-    private var orgHeroView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                // Professional icon
-                Image(systemName: "person.3.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.secondary.opacity(0.1))
+    private var titleText: String {
+        if supportsOrg {
+            return "Invite & Join Organizations"
+        } else {
+            return "Build Your Friend Circle"
+        }
+    }
+    
+    private var subtitleText: String {
+        if supportsOrg {
+            return "Expand your workspace by inviting team members or joining existing organizations."
+        } else {
+            return "Connect with the people who matter and share moments together."
+        }
+    }
+}
+
+// MARK: - Overlapping Circles View
+
+struct OverlappingCirclesView: View {
+    let mode: UserProfilePeopleMode
+    @Environment(\.colorScheme) private var colorScheme
+    
+    private var supportsOrg: Bool { mode != .friends }
+    
+    private var leftEmoji: String {
+        supportsOrg ? "💼" : "😊"
+    }
+    
+    private var middleEmoji: String {
+        supportsOrg ? "👔" : "😄"
+    }
+    
+    private var rightEmoji: String {
+        supportsOrg ? "📁" : "❤️"
+    }
+    
+    // Circle sizes
+    private let smallSize: CGFloat = 80
+    private let largeSize: CGFloat = 100
+    
+    // Calculate overlap amount - we want circles to overlap by about 30% of the smaller circle
+    private var overlapAmount: CGFloat {
+        smallSize * 0.3
+    }
+    
+    // Calculate positions so middle circle is centered and side circles overlap nicely
+    private var leftCircleOffset: CGFloat {
+        -largeSize / 2 - smallSize / 2 + overlapAmount
+    }
+    
+    private var rightCircleOffset: CGFloat {
+        largeSize / 2 + smallSize / 2 - overlapAmount
+    }
+    
+    var body: some View {
+        ZStack {
+            // Left circle (behind)
+            CircleEmojiView(emoji: leftEmoji, size: smallSize)
+                .offset(x: leftCircleOffset)
+            
+            // Middle circle (in front, largest)
+            CircleEmojiView(emoji: middleEmoji, size: largeSize)
+                .zIndex(1)
+            
+            // Right circle (behind)
+            CircleEmojiView(emoji: rightEmoji, size: smallSize)
+                .offset(x: rightCircleOffset)
+        }
+        .frame(height: largeSize)
+    }
+}
+
+struct CircleEmojiView: View {
+    let emoji: String
+    let size: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+    
+    var body: some View {
+        Text(emoji)
+            .font(.system(size: size * 0.5))
+            .frame(width: size, height: size)
+            .background(
+                Circle()
+                    .fill(
+                        Color(white: colorScheme == .dark ? 0.3 : 0.85)
                     )
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Invite & Join Organizations")
-                        .font(.system(.headline, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    
-                    Text("Expand your workspace by inviting team members or joining existing organizations.")
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            
-            Divider()
-                .padding(.vertical, 4)
-            
-            HStack(spacing: 8) {
-                // Team avatars
-                HStack(spacing: -8) {
-                    TeamAvatar()
-                    TeamAvatar()
-                    TeamAvatar()
-                }
-                
-                Text("Connect with your team")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
-    private var bothHeroView: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(.blue)
-                .frame(width: 48, height: 48)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue.opacity(0.1))
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Connect with People")
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(.primary)
-                
-                Text("Invite friends or team members to collaborate and share resources together.")
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.vertical, 20)
-        .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                Color.primary.opacity(colorScheme == .dark ? 0.3 : 0.2),
+                                lineWidth: 1.5
+                            )
+                    )
+            )
     }
 }
 

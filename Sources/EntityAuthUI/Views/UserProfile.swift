@@ -50,13 +50,11 @@ public struct UserProfileFeatureFlags: Sendable {
 public enum UserProfileModeIndicator: String, Sendable {
     case personal
     case work
-    case both
 }
 
 public enum UserProfilePeopleMode: String, Sendable {
     case org
     case friends
-    case both
 }
 
 public struct UserProfile: View {
@@ -185,8 +183,6 @@ private enum ProfileSection: String, CaseIterable, Hashable {
                     return "Invite friends"
                 case .work:
                     return "Invite & join organizations"
-                case .both:
-                    return "People"
                 }
             }
             return "People"
@@ -256,7 +252,6 @@ private struct UserProfileSheet: View {
     @Binding var isPresented: Bool
     @State private var selected: ProfileSection = .account
     @State private var path: [ProfileSection] = []
-    @State private var isEditingAccount: Bool = false
     @State private var peopleBadgeCount: Int = 0
     #if os(iOS)
     @State private var selectedDetent: PresentationDetent = .large
@@ -294,8 +289,58 @@ private struct UserProfileSheet: View {
             return ("Personal space", .green)
         case .work:
             return ("Workspace", .blue)
-        case .both:
-            return ("Hybrid mode", .pink)
+        }
+    }
+    
+    @ViewBuilder
+    private var toolbarButtons: some View {
+        Button(action: {
+            path.append(.accounts)
+        }) {
+            Image("Users", bundle: .module)
+                .resizable()
+                .renderingMode(.original)
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.plain)
+        .frame(width: 36, height: 36)
+        .background {
+            #if os(iOS)
+            if #available(iOS 26.0, *) {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .glassEffect(.regular.interactive(true), in: .circle)
+            } else {
+                Circle()
+                    .fill(.ultraThinMaterial)
+            }
+            #else
+            Circle()
+                .fill(.ultraThinMaterial)
+            #endif
+        }
+        .overlay {
+            Circle()
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
+                            Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        }
+        .help("Switch account")
+        
+        Button(action: { 
+            isPresented = false 
+        }) {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -452,56 +497,15 @@ private struct UserProfileSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button(action: {
-                        path.append(.accounts)
-                    }) {
-                        Image("Users", bundle: .module)
-                            .resizable()
-                            .renderingMode(.original)
-                            .frame(width: 20, height: 20)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: 36, height: 36)
-                    .background {
-                        #if os(iOS)
-                        if #available(iOS 26.0, *) {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .glassEffect(.regular.interactive(true), in: .circle)
-                        } else {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                        }
-                        #else
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                        #endif
-                    }
-                    .overlay {
-                        Circle()
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.2),
-                                        Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.08)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
-                            )
-                    }
-                    .help("Switch account")
-                    
-                    Button(action: { 
-                        isPresented = false 
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
+                    toolbarButtons
                 }
+                #else
+                ToolbarItemGroup(placement: .automatic) {
+                    toolbarButtons
+                }
+                #endif
             }
             .navigationDestination(for: ProfileSection.self) { section in
                 SectionDetail(
@@ -912,7 +916,6 @@ private struct UserProfileSheet: View {
     private var accountDetailView: some View {
         AccountSectionView(
             provider: provider,
-            isEditing: $isEditingAccount,
             onSave: { name, email in
                 Task {
                     await saveAccountChanges(name: name, email: email)
@@ -1253,7 +1256,6 @@ private struct UserProfileSheet: View {
         do {
             try await provider.setUsername(name)
             try await provider.setEmail(email)
-            isEditingAccount = false
         } catch {
             print("[UserProfile] Failed to save account changes: \(error)")
         }
@@ -1284,7 +1286,6 @@ private struct SectionDetail: View {
     let modeIndicator: UserProfileModeIndicator?
     let peopleMode: UserProfilePeopleMode
     let peopleInitialTab: PeopleTab?
-    @State private var isEditingAccount: Bool = false
 
     var body: some View {
         ScrollView {
@@ -1293,7 +1294,6 @@ private struct SectionDetail: View {
                 case .account:
                     AccountSectionView(
                         provider: provider,
-                        isEditing: $isEditingAccount,
                         onSave: { name, email in
                             Task {
                                 await saveAccountChanges(name: name, email: email)
@@ -1357,30 +1357,13 @@ private struct SectionDetail: View {
             .padding()
         }
         .navigationTitle(section.title(modeIndicator: modeIndicator))
-        .toolbar {
-            if section == .account {
-                ToolbarItem(placement: .automatic) {
-                    Button(action: { isEditingAccount.toggle() }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: isEditingAccount ? "xmark.circle.fill" : "pencil.circle.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                            
-                            Text(isEditingAccount ? "Cancel" : "Edit")
-                                .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                        }
-                        .foregroundStyle(isEditingAccount ? Color.secondary : Color.blue)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
+        // Edit controls now live inside the account pill; no toolbar edit button
     }
     
     private func saveAccountChanges(name: String, email: String) async {
         do {
             try await provider.setUsername(name)
             try await provider.setEmail(email)
-            isEditingAccount = false
         } catch {
             print("[SectionDetail] Failed to save account changes: \(error)")
         }
