@@ -47,8 +47,8 @@ public actor AccountManager: AccountManaging {
         if organizations.isEmpty {
             return .personal
         }
-        // For now, if there are orgs, it's workspace. Can be enhanced later for hybrid detection.
-        return .workspace
+        // If there are orgs, it's team mode.
+        return .team
     }
     
     private func loadAccounts() -> [StoredAccount] {

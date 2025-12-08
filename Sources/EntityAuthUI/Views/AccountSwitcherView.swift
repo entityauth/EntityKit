@@ -337,10 +337,8 @@ private struct AccountRow: View {
         switch account.mode {
         case .personal:
             return "Personal"
-        case .workspace:
-            return "Workspace"
-        case .hybrid:
-            return "Hybrid"
+        case .team:
+            return "Team"
         }
     }
 }

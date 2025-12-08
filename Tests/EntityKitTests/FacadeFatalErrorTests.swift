@@ -175,6 +175,20 @@ final class FacadeFatalErrorTests: XCTestCase {
         }
     }
     
+    final class MockAccountTypeService: AccountTypesProviding, @unchecked Sendable {
+        func listConfigs() async throws -> [AccountTypeConfig] { [] }
+        func getUserAccountType() async throws -> UserAccountType {
+            UserAccountType(accountTypeName: nil, config: nil)
+        }
+        func setAccountType(key: String) async throws -> UserAccountType {
+            UserAccountType(accountTypeName: key, config: nil)
+        }
+        func hasCapability(_ capability: String) async throws -> Bool { false }
+        func getCapabilities() async throws -> AccountTypeCapabilities {
+            AccountTypeCapabilities(hasFriends: false, hasOrgs: false, hasTeamInvites: false)
+        }
+    }
+    
     func makeDependencies(
         authService: MockAuthService,
         organizationService: MockOrganizationService,
@@ -188,6 +202,7 @@ final class FacadeFatalErrorTests: XCTestCase {
         let entitiesService = MockEntitiesService()
         let invitationService = MockInvitationService()
         let friendService = MockFriendService()
+        let accountTypeService = MockAccountTypeService()
         
         return EntityAuthFacade.Dependencies(
             config: config,
@@ -198,6 +213,7 @@ final class FacadeFatalErrorTests: XCTestCase {
             entitiesService: entitiesService,
             invitationService: invitationService,
             friendService: friendService,
+            accountTypeService: accountTypeService,
             refreshHandler: refresher,
             apiClient: apiClient,
             realtime: realtime

@@ -55,7 +55,7 @@ public struct UserProfileFeatureFlags: Sendable {
 
 public enum UserProfileModeIndicator: String, Sendable {
     case personal
-    case work
+    case team
 }
 
 public enum UserProfilePeopleMode: String, Sendable {
@@ -187,7 +187,7 @@ private enum ProfileSection: String, CaseIterable, Hashable {
                 switch modeIndicator {
                 case .personal:
                     return "Invite friends"
-                case .work:
+                case .team:
                     return "Invite & join organizations"
                 }
             }
@@ -220,8 +220,8 @@ private enum ProfileSection: String, CaseIterable, Hashable {
     /// - Parameters:
     ///   - flags: Feature flags controlling optional sections.
     ///   - modeIndicator: When `.personal`, we hide Organizations to keep the
-    ///     sheet focused on the single personal space. Work/Hybrid modes still
-    ///     expose organization management just like the web UI.
+    ///     sheet focused on the single personal space. Team mode still
+    ///     exposes organization management just like the web UI.
     static func visibleSections(
         with flags: UserProfileFeatureFlags,
         modeIndicator: UserProfileModeIndicator?
@@ -293,8 +293,8 @@ private struct UserProfileSheet: View {
         switch modeIndicator {
         case .personal:
             return ("Personal space", .green)
-        case .work:
-            return ("Workspace", .blue)
+        case .team:
+            return ("Team mode", .blue)
         }
     }
     

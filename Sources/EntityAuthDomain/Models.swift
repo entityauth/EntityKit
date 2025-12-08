@@ -96,8 +96,7 @@ extension ActiveOrganizationDTO {
 
 public enum AccountMode: String, Codable, Sendable {
     case personal
-    case workspace
-    case hybrid
+    case team
 }
 
 public struct AccountSummary: Identifiable, Hashable, Codable, Sendable {
