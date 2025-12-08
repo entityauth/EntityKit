@@ -37,6 +37,7 @@ public struct AccountTypeConfig: Codable, Sendable, Identifiable, Hashable {
     public let _id: String
     public let name: String
     public let sortOrder: Int
+    public let capabilities: AccountTypeCapabilities
     public let createdAt: Int
     
     public var id: String { _id }
@@ -48,11 +49,13 @@ public struct AccountTypeConfig: Codable, Sendable, Identifiable, Hashable {
         _id: String,
         name: String,
         sortOrder: Int,
+        capabilities: AccountTypeCapabilities,
         createdAt: Int
     ) {
         self._id = _id
         self.name = name
         self.sortOrder = sortOrder
+        self.capabilities = capabilities
         self.createdAt = createdAt
     }
 }
@@ -149,12 +152,10 @@ public final class AccountTypeService: AccountTypesProviding {
     }
     
     public func getCapabilities() async throws -> AccountTypeCapabilities {
-        let queryItems: [URLQueryItem] = [.init(name: "check", value: "hasFriends,hasOrgs,hasTeamInvites")]
-        let req = APIRequest(method: .get, path: "/api/account-types/capability", queryItems: queryItems)
+        let req = APIRequest(method: .get, path: "/api/account-types/user/capabilities")
         let responseData = try await client.send(req)
         try handleError(responseData)
-        let response = try JSONDecoder().decode(CapabilityCheckResponse.self, from: responseData)
-        return response.capabilities
+        return try JSONDecoder().decode(AccountTypeCapabilities.self, from: responseData)
     }
 }
 
