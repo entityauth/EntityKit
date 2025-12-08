@@ -130,6 +130,7 @@ public actor EntityAuthFacade {
         public var imageUrl: String?
         public var organizations: [OrganizationSummary]
         public var activeOrganization: ActiveOrganization?
+        public var accountTypeName: String?
 
         public init(
             accessToken: String?,
@@ -140,7 +141,8 @@ public actor EntityAuthFacade {
             email: String? = nil,
             imageUrl: String? = nil,
             organizations: [OrganizationSummary],
-            activeOrganization: ActiveOrganization?
+            activeOrganization: ActiveOrganization?,
+            accountTypeName: String? = nil
         ) {
             self.accessToken = accessToken
             self.refreshToken = refreshToken
@@ -151,7 +153,12 @@ public actor EntityAuthFacade {
             self.imageUrl = imageUrl
             self.organizations = organizations
             self.activeOrganization = activeOrganization
+            self.accountTypeName = accountTypeName
         }
+        
+        // Convenience properties for account type
+        public var isPersonalAccount: Bool { accountTypeName == "personal" }
+        public var isTeamAccount: Bool { accountTypeName == "team" }
     }
 
     private let authState: AuthState
@@ -841,7 +848,10 @@ public actor EntityAuthFacade {
     
     /// Set the current user's account type
     public func setAccountType(key: String) async throws -> UserAccountType {
-        try await dependencies.accountTypeService.setAccountType(key: key)
+        let result = try await dependencies.accountTypeService.setAccountType(key: key)
+        snapshot.accountTypeName = result.accountTypeName
+        emit()
+        return result
     }
     
     /// Check if the current user has a specific capability based on their account type
@@ -1059,6 +1069,16 @@ public actor EntityAuthFacade {
                 print("[EntityAuth][refreshUserData] WARNING: No active org id and \(organizations.count) org(s) exist - setting activeOrganization=nil")
                 snapshot.activeOrganization = nil
             }
+            
+            // Fetch account type (non-blocking - don't fail refresh if this fails)
+            do {
+                let userAccountType = try await dependencies.accountTypeService.getUserAccountType()
+                snapshot.accountTypeName = userAccountType.accountTypeName
+                print("[EntityAuth][refreshUserData] Account type: \(userAccountType.accountTypeName ?? "nil")")
+            } catch {
+                print("[EntityAuth][refreshUserData] WARNING: Failed to fetch account type: \(error)")
+                // Don't fail the overall refresh - account type is supplementary
+            }
         } catch {
             print("[EntityAuth][refreshUserData] ERROR: Bootstrap failed: \(error)")
             print("[EntityAuth][refreshUserData] Error type: \(type(of: error))")
@@ -1124,6 +1144,14 @@ public actor EntityAuthFacade {
             snapshot.username = me.username
             snapshot.email = me.email
             snapshot.imageUrl = me.imageUrl
+        }
+        
+        // Fetch account type (non-blocking)
+        do {
+            let userAccountType = try await dependencies.accountTypeService.getUserAccountType()
+            snapshot.accountTypeName = userAccountType.accountTypeName
+        } catch {
+            print("[EntityAuth][refreshUserDataLegacy] WARNING: Failed to fetch account type: \(error)")
         }
     }
 

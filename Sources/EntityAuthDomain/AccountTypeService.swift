@@ -35,48 +35,39 @@ public struct AccountTypeCapabilities: Codable, Sendable, Hashable {
 
 public struct AccountTypeConfig: Codable, Sendable, Identifiable, Hashable {
     public let _id: String
-    public let key: String
-    public let label: String
-    public let description: String?
-    public let icon: String?
-    public let capabilities: AccountTypeCapabilities
-    public let isDefault: Bool
+    public let name: String
     public let sortOrder: Int
-    public let status: String
+    public let createdAt: Int
     
     public var id: String { _id }
     
+    /// Convenience accessor (alias for name)
+    public var key: String { name }
+    
     public init(
         _id: String,
-        key: String,
-        label: String,
-        description: String?,
-        icon: String?,
-        capabilities: AccountTypeCapabilities,
-        isDefault: Bool,
+        name: String,
         sortOrder: Int,
-        status: String
+        createdAt: Int
     ) {
         self._id = _id
-        self.key = key
-        self.label = label
-        self.description = description
-        self.icon = icon
-        self.capabilities = capabilities
-        self.isDefault = isDefault
+        self.name = name
         self.sortOrder = sortOrder
-        self.status = status
+        self.createdAt = createdAt
     }
 }
 
 public struct UserAccountType: Codable, Sendable {
-    public let accountTypeKey: String
+    public let accountTypeName: String?
     public let config: AccountTypeConfig?
     
-    public init(accountTypeKey: String, config: AccountTypeConfig?) {
-        self.accountTypeKey = accountTypeKey
+    public init(accountTypeName: String?, config: AccountTypeConfig?) {
+        self.accountTypeName = accountTypeName
         self.config = config
     }
+    
+    /// Convenience accessor (alias for accountTypeName)
+    public var accountTypeKey: String? { accountTypeName }
 }
 
 // MARK: - Response Types
@@ -134,7 +125,7 @@ public final class AccountTypeService: AccountTypesProviding {
     }
     
     public func setAccountType(key: String) async throws -> UserAccountType {
-        let body: [String: Any] = ["accountTypeKey": key]
+        let body: [String: Any] = ["accountTypeName": key]
         let data = try JSONSerialization.data(withJSONObject: body)
         let req = APIRequest(method: .post, path: "/api/account-types/user", body: data)
         let responseData = try await client.send(req)
